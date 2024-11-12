@@ -3,7 +3,10 @@ Python implementation of ShapeDTW
 
 For developers : 
 
-    $ pip install -e ".[all]"
+    $ conda create -n shapeDTW
+    $ conda activate shapeDTW
+    $ pip install uv
+    $ uv pip install -e ".[all]"
 
 To run tests : 
 

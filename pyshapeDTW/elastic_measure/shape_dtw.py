@@ -4,15 +4,8 @@ import numpy as np
 import numpy.typing as npt
 from dtw import dtw
 
+from pyshapeDTW.descriptors.base import BaseDescriptor
 from pyshapeDTW.elastic_measure.warping import wpath2mat
-
-
-class ShapeDescriptor(Protocol):
-    """Protocol defining shape descriptor interface."""
-
-    def __call__(self, subsequence: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        """Compute shape descriptor for a subsequence."""
-        ...
 
 
 class ShapeDTW:
@@ -32,14 +25,14 @@ class ShapeDTW:
         self,
         p: npt.NDArray[np.float64],
         q: npt.NDArray[np.float64],
-        descriptor: ShapeDescriptor,
+        descriptor: BaseDescriptor,
     ) -> tuple[float, float, int, npt.NDArray[np.int64]]:
         """Compute Shape-DTW between sequences.
 
         Args:
             p: First sequence
             q: Second sequence
-            descriptor: Shape descriptor function to use
+            descriptor: Shape descriptor to use
 
         Returns:
             raw_distance: Distance between aligned raw sequences
@@ -53,14 +46,14 @@ class ShapeDTW:
         self,
         p: npt.NDArray[np.float64],
         q: npt.NDArray[np.float64],
-        descriptor: ShapeDescriptor,
+        descriptor: BaseDescriptor,
     ) -> tuple[float, float, int, npt.NDArray[np.int64]]:
         """Compute Shape-DTW between sequences.
 
         Args:
             p: First sequence
             q: Second sequence
-            descriptor: Shape descriptor function to use
+            descriptor: Shape descriptor to use
 
         Returns:
             raw_distance: Distance between aligned raw sequences
@@ -124,13 +117,13 @@ class ShapeDTW:
         return float(np.sqrt(np.sum((warped_p - warped_q) ** 2)))
 
     def _compute_shape_descriptors(
-        self, seq: npt.NDArray[np.float64], descriptor: ShapeDescriptor
+        self, seq: npt.NDArray[np.float64], descriptor: BaseDescriptor
     ) -> npt.NDArray[np.float64]:
         """Compute shape descriptors for sequence.
 
         Args:
             seq: Input sequence
-            descriptor: Shape descriptor function
+            descriptor: Shape descriptor
 
         Returns:
             descriptors: Array of shape descriptors
@@ -185,13 +178,13 @@ class ShapeDTWMulti(ShapeDTW):
     """Multivariate version of Shape-DTW."""
 
     def _compute_shape_descriptors(
-        self, seq: npt.NDArray[np.float64], descriptor: ShapeDescriptor
+        self, seq: npt.NDArray[np.float64], descriptor: BaseDescriptor
     ) -> npt.NDArray[np.float64]:
         """Compute shape descriptors handling multiple dimensions.
 
         Args:
             seq: Input multivariate sequence
-            descriptor: Shape descriptor function
+            descriptor: Shape descriptor
 
         Returns:
             descriptors: Array of concatenated shape descriptors

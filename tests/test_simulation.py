@@ -113,45 +113,6 @@ def test_stretching_properties() -> None:
 
 
 if __name__ == "__main__":
-    # def test_shape_dtw_alignment(
-    #     base_sequence: npt.NDArray[np.float64], shape_dtw: ShapeDTW, hog1d: HOG1D
-    # ) -> None:
-    #     """Test ShapeDTW's ability to recover true alignment."""
-    #     # Create transformed pair
-    #     orig, transformed, gt_align = create_transformed_pair(base_sequence)
-
-    #     # Run Shape-DTW
-    #     _, _, _, pred_align = shape_dtw(orig, transformed, hog1d)
-
-    #     # Compute alignment error
-    #     error = alignment_error(gt_align, pred_align)
-
-    #     # Error should be reasonable (threshold determined empirically)
-    #     assert error / len(gt_align) < 0.5
-
-    # @pytest.mark.parametrize("noise_level", [0.0, 0.1, 0.2])
-    # def test_noise_robustness(
-    #     base_sequence: npt.NDArray[np.float64],
-    #     shape_dtw: ShapeDTW,
-    #     hog1d: HOG1D,
-    #     noise_level: float,
-    # ) -> None:
-    #     """Test robustness to noise."""
-    #     # Create transformed pair
-    #     orig, transformed, gt_align = create_transformed_pair(base_sequence)
-
-    #     # Add noise
-    #     noisy = transformed + np.random.normal(0, noise_level, transformed.shape)
-
-    #     # Run Shape-DTW
-    #     _, _, _, pred_align = shape_dtw(orig, noisy, hog1d)
-
-    #     # Compute alignment error
-    #     error = alignment_error(gt_align, pred_align)
-
-    #     # Error should increase gracefully with noise
-    #     assert error / len(gt_align) < 0.5 + noise_level
-
     # Run some visual tests
     import matplotlib.pyplot as plt
 

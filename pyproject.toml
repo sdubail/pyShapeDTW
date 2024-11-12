@@ -74,6 +74,32 @@ banned-module-level-imports = ["matplotlib"] # require a lazy import
 [tool.ruff.lint.isort]
 known-first-party = ["pyshapeDTW", "tests"]
 
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.*" = [
+  "A",
+  "ARG",
+  "B",
+  "BLE",
+  "C901",
+  "D",
+  "DTZ",
+  "EM",
+  "FBT",
+  "G",
+  "N",
+  "PGH",
+  "PIE",
+  "PLR",
+  "PLW",
+  "PTH",
+  "RSE",
+  "S",
+  "S101",
+  "SIM",
+  # "TCH",
+  "TRY",
+]
+
 [tool.mypy]
 # plugins = ["pydantic.mypy"]
 python_version = "3.12" 

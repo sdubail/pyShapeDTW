@@ -19,7 +19,8 @@ scripts = { pyshapeDTW = "pyshapeDTW:__main__.app" }
 dependencies = [
     "numpy",
     "dtw-python",
-    "matplotlib"
+    "matplotlib",
+    "typer",
 ]
 
 [project.optional-dependencies]

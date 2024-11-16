@@ -154,7 +154,7 @@ def compare_alignments(
 
     # Save if requested
     if save_path is not None:
-        plt.savefig(save_path)
+        plt.savefig(f"../plots/{save_path}")
 
     # Show if requested
     if show:

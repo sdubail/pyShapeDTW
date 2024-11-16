@@ -191,7 +191,7 @@ if __name__ == "__main__":
 
         # Save or show based on test environment
         try:
-            plt.savefig("paa_multivariate_visualization_test.png")
+            plt.savefig("../plots/paa_multivariate_visualization_test.png")
         except:
             plt.close()
 

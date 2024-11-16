@@ -9,6 +9,7 @@ from dtw import dtw
 from pyshapeDTW.descriptors.base import BaseDescriptor
 from pyshapeDTW.descriptors.hog1d import HOG1D, HOG1DParams
 from pyshapeDTW.descriptors.paa import PAA, PAAParams
+from pyshapeDTW.descriptors.wavelets import DWT, DWTParams
 from pyshapeDTW.elastic_measure.shape_dtw import ShapeDTW
 from pyshapeDTW.simulation.transforms import (
     ScaleParams,
@@ -24,6 +25,7 @@ app = typer.Typer()
 DESCRIPTORS: dict[str, BaseDescriptor] = {
     "hog1d": HOG1D(HOG1DParams(cells=(1, 25))),
     "paa": PAA(PAAParams(seg_num=4)),
+    "dwt": DWT(DWTParams()),
 }
 
 
@@ -154,7 +156,7 @@ def compare_alignments(
 
     # Save if requested
     if save_path is not None:
-        plt.savefig(f"../plots/{save_path}")
+        plt.savefig(f"pyshapeDTW/plots/{save_path}")
 
     # Show if requested
     if show:

@@ -3,4 +3,4 @@
 .pytest_cache/
 pyshapeDTW.egg-info/
 **/__pycache__
-/plots
+**/plots

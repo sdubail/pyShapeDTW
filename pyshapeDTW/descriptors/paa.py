@@ -1,5 +1,4 @@
 from dataclasses import dataclass
-from typing import Optional, Tuple
 
 import numpy as np
 import numpy.typing as npt

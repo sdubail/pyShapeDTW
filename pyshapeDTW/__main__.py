@@ -1,3 +1,4 @@
+from enum import Enum
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -5,7 +6,9 @@ import numpy as np
 import typer
 from dtw import dtw
 
+from pyshapeDTW.descriptors.base import BaseDescriptor
 from pyshapeDTW.descriptors.hog1d import HOG1D, HOG1DParams
+from pyshapeDTW.descriptors.paa import PAA, PAAParams
 from pyshapeDTW.elastic_measure.shape_dtw import ShapeDTW
 from pyshapeDTW.simulation.transforms import (
     ScaleParams,
@@ -17,6 +20,11 @@ from pyshapeDTW.simulation.transforms import (
 from pyshapeDTW.visualization.plots import plot_warped_ts
 
 app = typer.Typer()
+
+DESCRIPTORS: dict[str, BaseDescriptor] = {
+    "hog1d": HOG1D(HOG1DParams(cells=(1, 25))),
+    "paa": PAA(PAAParams(seg_num=4)),
+}
 
 
 def generate_test_sequences(
@@ -85,6 +93,7 @@ def compute_alignment_error(
 
 @app.command("sim-alignment")
 def compare_alignments(
+    descriptor_arg: str = typer.Option("hog1d", help="Descriptor to use for shapeDTW"),
     length: int = typer.Option(200, help="Length of base sequence"),
     scale_min: float = typer.Option(0.4, help="Minimum scaling factor"),
     scale_max: float = typer.Option(1.0, help="Maximum scaling factor"),
@@ -109,9 +118,9 @@ def compare_alignments(
     dtw_match = np.column_stack((alignment.index1, alignment.index2))
 
     # Run ShapeDTW
+    descriptor = DESCRIPTORS[descriptor_arg]
     sdtw = ShapeDTW(seqlen=20)
-    hog1d = HOG1D(HOG1DParams(cells=(1, 25)))
-    _, _, _, sdtw_match = sdtw(orig, transformed, hog1d)
+    _, _, _, sdtw_match = sdtw(orig, transformed, descriptor)
 
     # Create plots
     fig_dtw = plt.figure(figsize=(15, 12))
@@ -145,7 +154,7 @@ def compare_alignments(
 
     # Save if requested
     if save_path is not None:
-        plt.savefig(save_path)
+        plt.savefig(f"../plots/{save_path}")
 
     # Show if requested
     if show:

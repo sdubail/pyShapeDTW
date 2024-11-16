@@ -21,6 +21,7 @@ dependencies = [
     "dtw-python",
     "matplotlib",
     "typer",
+    "PyWavelets"
 ]
 
 [project.optional-dependencies]

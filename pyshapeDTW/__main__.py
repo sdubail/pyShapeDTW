@@ -164,4 +164,5 @@ def compare_alignments(
 
 
 if __name__ == "__main__":
+    # start CLI app
     app()

@@ -10,7 +10,7 @@ For developers :
 
 To run tests : 
 
-    $ pytests tests/
+    $ pytest tests/
 
 To use CLI (for now just one function)
 

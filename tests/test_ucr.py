@@ -1,48 +1,10 @@
-from collections.abc import Generator
-from typing import Any
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pandas as pd
 import pytest
 
 from pyshapeDTW.data.ucr import UCRDataset
-
-
-@pytest.fixture(autouse=True)
-def mock_ucr() -> Generator[MagicMock, None, None]:
-    """Mock UCR_UEA_datasets to avoid downloads."""
-    # Create synthetic data
-    univariate_data = (
-        np.random.randn(2, 10, 1),  # X_train
-        np.array([0, 1]),  # y_train
-        np.random.randn(2, 10, 1),  # X_test
-        np.array([1, 0]),  # y_test
-    )
-
-    multivariate_data = (
-        np.random.randn(2, 10, 3),  # X_train
-        np.array([0, 1]),  # y_train
-        np.random.randn(2, 10, 3),  # X_test
-        np.array([1, 0]),  # y_test
-    )
-
-    def mock_load_dataset(name: str) -> Any:
-        if name == "MultivariateDataset":
-            return multivariate_data
-        return univariate_data
-
-    with patch("pyshapeDTW.data.ucr.UCR_UEA_datasets") as mock_class:
-        # Setup mock methods
-        mock_class.return_value.list_datasets.return_value = [
-            "Dataset1",
-            "Dataset2",
-            "MultivariateDataset",
-        ]
-        mock_class.return_value.list_cached_datasets.return_value = ["Dataset1"]
-        mock_class.return_value.load_dataset.side_effect = mock_load_dataset
-
-        yield mock_class
 
 
 def test_list_datasets() -> None:

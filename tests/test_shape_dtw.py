@@ -2,21 +2,8 @@ import numpy as np
 import numpy.typing as npt
 import pytest
 
+from pyshapeDTW.descriptors.base import BaseDescriptor
 from pyshapeDTW.elastic_measure.shape_dtw import ShapeDTW, ShapeDTWMulti
-
-
-class MockDescriptor:
-    """Simple mock descriptor for testing."""
-
-    def __call__(self, subsequence: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        """Returns mean and std of subsequence as descriptor."""
-        return np.array([np.mean(subsequence), np.std(subsequence)], dtype=np.float64)
-
-
-@pytest.fixture
-def descriptor() -> MockDescriptor:
-    """Fixture providing mock descriptor."""
-    return MockDescriptor()
 
 
 @pytest.fixture
@@ -57,7 +44,7 @@ def test_shape_dtw_init() -> None:
 def test_basic_shape_dtw(
     shape_dtw: ShapeDTW,
     simple_sequences: tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]],
-    descriptor: MockDescriptor,
+    descriptor: BaseDescriptor,
 ) -> None:
     """Test basic ShapeDTW functionality."""
     p, q = simple_sequences
@@ -76,7 +63,7 @@ def test_basic_shape_dtw(
 def test_shape_descriptors(
     shape_dtw: ShapeDTW,
     simple_sequences: tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]],
-    descriptor: MockDescriptor,
+    descriptor: BaseDescriptor,
 ) -> None:
     """Test shape descriptor computation."""
     p, q = simple_sequences
@@ -118,7 +105,7 @@ def test_subsequence_sampling(shape_dtw: ShapeDTW) -> None:
 @pytest.mark.parametrize("metric", ["euclidean", "cityblock", "cosine"])
 def test_different_metrics(
     simple_sequences: tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]],
-    descriptor: MockDescriptor,
+    descriptor: BaseDescriptor,
     metric: str,
 ) -> None:
     """Test different distance metrics."""
@@ -135,7 +122,7 @@ def test_different_metrics(
 
 def test_multivariate_shape_dtw(
     multi_sequences: tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]],
-    descriptor: MockDescriptor,
+    descriptor: BaseDescriptor,
 ) -> None:
     """Test multivariate ShapeDTW."""
     p, q = multi_sequences
@@ -154,7 +141,7 @@ def test_multivariate_shape_dtw(
 @pytest.mark.parametrize("seqlen", [10, 20, 30])
 def test_different_sequence_lengths(
     simple_sequences: tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]],
-    descriptor: MockDescriptor,
+    descriptor: BaseDescriptor,
     seqlen: int,
 ) -> None:
     """Test different subsequence lengths."""
@@ -190,7 +177,7 @@ def test_aligned_distance(
     assert np.allclose(distance, np.sqrt(np.sum((p - q) ** 2)))
 
 
-def test_input_validation(shape_dtw: ShapeDTW, descriptor: MockDescriptor) -> None:
+def test_input_validation(shape_dtw: ShapeDTW, descriptor: BaseDescriptor) -> None:
     """Test handling of different input formats."""
     # 1D input
     p: npt.NDArray[np.float64] = np.array([1.0, 2.0, 3.0], dtype=np.float64)

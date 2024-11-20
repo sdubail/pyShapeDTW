@@ -21,7 +21,8 @@ dependencies = [
     "dtw-python",
     "matplotlib",
     "typer",
-    "PyWavelets"
+    "PyWavelets",
+    "tslearn", # if crashes comment this line and install on the side with pip
 ]
 
 [project.optional-dependencies]

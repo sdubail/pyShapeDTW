@@ -22,6 +22,7 @@ dependencies = [
     "matplotlib",
     "typer",
     "PyWavelets",
+    "tqdm",
     "tslearn", # if crashes comment this line and install on the side with pip
 ]
 

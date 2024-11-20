@@ -1,6 +1,7 @@
 import matplotlib.pyplot as plt
 import numpy as np
 import numpy.typing as npt
+import pandas as pd
 
 from pyshapeDTW.elastic_measure.warping import wpath2mat
 
@@ -93,4 +94,31 @@ def plot_warped_ts(
     ax2.set_title("Warped Sequences")
 
     fig.tight_layout()
+    return fig
+
+
+def plot_alignment_eval(results_df: pd.DataFrame) -> plt.Figure:
+    """Plot alignment errors vs stretch percentage."""
+    fig, ax = plt.subplots(figsize=(10, 6))
+
+    for method in results_df["method"].unique():
+        method_data = results_df[results_df["method"] == method]
+
+        means = method_data.groupby("stretch_pct")["error"].mean()
+        stds = method_data.groupby("stretch_pct")["error"].std()
+
+        ax.plot(means.index, means.values, marker="o", label=method)
+        ax.fill_between(
+            means.index,
+            means.values - stds.values,
+            means.values + stds.values,
+            alpha=0.2,
+        )
+
+    ax.set_xlabel("Stretch Percentage")
+    ax.set_ylabel("Alignment Error")
+    ax.set_title("Alignment Error vs Stretch Percentage")
+    ax.legend()
+    ax.grid(True)
+
     return fig

@@ -4,3 +4,5 @@
 pyshapeDTW.egg-info/
 **/__pycache__
 **/plots
+**/results
+.DS_Store

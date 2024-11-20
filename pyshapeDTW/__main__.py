@@ -1,4 +1,3 @@
-from enum import Enum
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -11,14 +10,14 @@ from pyshapeDTW.descriptors.hog1d import HOG1D, HOG1DParams
 from pyshapeDTW.descriptors.paa import PAA, PAAParams
 from pyshapeDTW.descriptors.wavelets import DWT, DWTParams
 from pyshapeDTW.elastic_measure.shape_dtw import ShapeDTW
-from pyshapeDTW.simulation.transforms import (
+from pyshapeDTW.evaluation.alignment import (
     ScaleParams,
     StretchParams,
     scale_time_series,
     simulate_smooth_curve,
     stretching_ts,
 )
-from pyshapeDTW.visualization.plots import plot_warped_ts
+from pyshapeDTW.evaluation.plots import plot_warped_ts
 
 app = typer.Typer()
 
@@ -156,7 +155,7 @@ def compare_alignments(
 
     # Save if requested
     if save_path is not None:
-        plt.savefig(f"pyshapeDTW/plots/{save_path}")
+        plt.savefig(f"pyshapeDTW/results/{save_path}")
 
     # Show if requested
     if show:

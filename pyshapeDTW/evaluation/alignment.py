@@ -127,6 +127,33 @@ def scale_time_series(
     return scale * ts
 
 
+def compute_alignment_error(
+    pred_align: np.ndarray, gt_align: np.ndarray, seq_len1: int, seq_len2: int
+) -> float:
+    """Compute error between predicted and ground truth alignments."""
+
+    if len(gt_align) == 0:
+        raise ValueError("Empty alignment passed")
+
+    # Convert alignments to binary matrices
+    pred_matrix = np.zeros((seq_len1, seq_len2))
+    gt_matrix = np.zeros((seq_len1, seq_len2))
+
+    # Fill matrices
+    for i, j in pred_align:
+        if i < seq_len1 and j < seq_len2:
+            pred_matrix[i, j] = 1
+
+    for i, j in gt_align:
+        gt_matrix[i, j] = 1
+
+    # Compute error as normalized sum of absolute differences
+    error = np.sum(np.abs(pred_matrix - gt_matrix))
+    error = error / len(gt_align)
+
+    return error
+
+
 @dataclass
 class AlignmentEvalConfig:
     """Configuration for alignment evaluation."""
@@ -211,7 +238,7 @@ class AlignmentEvaluator:
         # Standard DTW
         alignment = dtw(original, transformed)
         dtw_match = np.column_stack((alignment.index1, alignment.index2))
-        dtw_error = self._compute_alignment_error(
+        dtw_error = compute_alignment_error(
             dtw_match, gt_align, len(original), len(transformed)
         )
 
@@ -244,7 +271,7 @@ class AlignmentEvaluator:
         sdtw = ShapeDTW(seqlen=20)
         for desc_name, descriptor in self.config.descriptors.items():
             _, _, _, sdtw_match = sdtw(original, transformed, descriptor)
-            sdtw_error = self._compute_alignment_error(
+            sdtw_error = compute_alignment_error(
                 sdtw_match, gt_align, len(original), len(transformed)
             )
 
@@ -259,52 +286,9 @@ class AlignmentEvaluator:
 
         return results
 
-    def _compute_alignment_error(
-        self, pred_align: np.ndarray, gt_align: np.ndarray, seq_len1: int, seq_len2: int
-    ) -> float:
-        """Compute error between predicted and ground truth alignments."""
-
-        if len(gt_align) == 0:
-            raise ValueError("Empty alignment passed")
-
-        # Convert alignments to binary matrices
-        pred_matrix = np.zeros((seq_len1, seq_len2))
-        gt_matrix = np.zeros((seq_len1, seq_len2))
-
-        # Fill matrices
-        for i, j in pred_align:
-            if i < seq_len1 and j < seq_len2:
-                pred_matrix[i, j] = 1
-
-        for i, j in gt_align:
-            gt_matrix[i, j] = 1
-
-        # Compute error as normalized sum of absolute differences
-        error = np.sum(np.abs(pred_matrix - gt_matrix))
-        error = error / len(gt_align)
-
-        return error
-
     def run_evaluation(self) -> pd.DataFrame:
         """Run evaluation on all configured datasets."""
         for dataset in self.config.dataset_names:
             self.evaluate_dataset(dataset)
 
         return pd.DataFrame(self.results)
-
-
-# Example usage:
-if __name__ == "__main__":
-    config = AlignmentEvalConfig(
-        dataset_names=["GunPoint", "ECG200", "Coffee"],
-        n_pairs_per_dataset=5,
-        results_dir=Path("pyshapeDTW/results"),
-    )
-
-    evaluator = AlignmentEvaluator(config)
-    results_df = evaluator.run_evaluation()
-
-    # Plot and save results
-    fig = plot_alignment_eval(results_df)
-    fig.savefig(config.results_dir / "alignment_results.png")
-    results_df.to_csv(config.results_dir / "alignment_results.csv", index=False)

@@ -11,13 +11,16 @@ from pyshapeDTW.descriptors.paa import PAA, PAAParams
 from pyshapeDTW.descriptors.wavelets import DWT, DWTParams
 from pyshapeDTW.elastic_measure.shape_dtw import ShapeDTW
 from pyshapeDTW.evaluation.alignment import (
+    AlignmentEvalConfig,
+    AlignmentEvaluator,
     ScaleParams,
     StretchParams,
+    compute_alignment_error,
     scale_time_series,
     simulate_smooth_curve,
     stretching_ts,
 )
-from pyshapeDTW.evaluation.plots import plot_warped_ts
+from pyshapeDTW.evaluation.plots import plot_alignment_eval, plot_warped_ts
 
 app = typer.Typer()
 
@@ -57,43 +60,8 @@ def generate_test_sequences(
     return seq, transformed, gt_align
 
 
-def compute_alignment_error(
-    pred_align: np.ndarray,  # type:ignore
-    gt_align: np.ndarray,  # type:ignore
-    seq_len1: int,
-    seq_len2: int,
-) -> float:
-    """Compute alignment error using warping matrices.
-
-    Args:
-        pred_align: Predicted alignment path
-        gt_align: Ground truth alignment path
-        seq_len1: Length of first sequence
-        seq_len2: Length of second sequence
-    """
-    # Convert alignments to binary matrices
-    pred_matrix = np.zeros((seq_len1, seq_len2))
-    gt_matrix = np.zeros((seq_len1, seq_len2))
-
-    # Fill matrices
-    for i, j in pred_align:
-        if i < seq_len1 and j < seq_len2:  # Guard against out of bounds
-            pred_matrix[i, j] = 1
-
-    for i, j in gt_align:
-        gt_matrix[i, j] = 1
-
-    # Compute error as sum of absolute differences
-    error = np.sum(np.abs(pred_matrix - gt_matrix))
-
-    # Normalize by path length
-    error = error / len(gt_align)
-
-    return error
-
-
 @app.command("sim-alignment")
-def compare_alignments(
+def simulate_alignments(
     descriptor_arg: str = typer.Option("hog1d", help="Descriptor to use for shapeDTW"),
     length: int = typer.Option(200, help="Length of base sequence"),
     scale_min: float = typer.Option(0.4, help="Minimum scaling factor"),
@@ -160,6 +128,30 @@ def compare_alignments(
     # Show if requested
     if show:
         plt.show()
+
+
+@app.command("ucr-alignment")
+def ucr_alignment(
+    dataset_names: list[str] | None = None, n_pairs_per_dataset: int = 5
+) -> None:
+    ### Plenty of additionnal arguments to add (streching, scaling...)
+
+    if dataset_names is None:
+        dataset_names = ["GunPoint", "ECG200", "Coffee"]
+
+    config = AlignmentEvalConfig(
+        dataset_names=dataset_names,
+        n_pairs_per_dataset=n_pairs_per_dataset,
+        results_dir=Path("pyshapeDTW/results"),
+    )
+
+    evaluator = AlignmentEvaluator(config)
+    results_df = evaluator.run_evaluation()
+
+    # Plot and save results
+    fig = plot_alignment_eval(results_df)
+    fig.savefig(config.results_dir / "alignment_results.png")
+    results_df.to_csv(config.results_dir / "alignment_results.csv", index=False)
 
 
 if __name__ == "__main__":

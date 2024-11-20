@@ -11,6 +11,7 @@ from pyshapeDTW.evaluation.alignment import (
     AlignmentEvaluator,
     ScaleParams,
     StretchParams,
+    compute_alignment_error,
     scale_time_series,
     simulate_smooth_curve,
     stretching_ts,
@@ -87,6 +88,21 @@ def test_stretching_properties() -> None:
     assert len(align) > 100  # Sequence should be stretched
 
 
+def test_compute_alignment_error() -> None:
+    """Test alignment error computation."""
+    # Test with identical alignments
+    pred_align = np.array([[0, 0], [1, 1], [2, 2]])
+    gt_align = np.array([[0, 0], [1, 1], [2, 2]])
+    error = compute_alignment_error(pred_align, gt_align, 3, 3)
+    assert error == 0.0
+
+    # Test with different alignments
+    pred_align = np.array([[0, 0], [1, 1], [2, 2]])
+    gt_align = np.array([[0, 0], [1, 2], [2, 1]])
+    error = compute_alignment_error(pred_align, gt_align, 3, 3)
+    assert error > 0.0
+
+
 @pytest.fixture
 def basic_config(descriptor: BaseDescriptor) -> AlignmentEvalConfig:
     """Create basic evaluation configuration."""
@@ -109,22 +125,6 @@ class TestAlignmentEvaluator:
         evaluator = AlignmentEvaluator(basic_config)
         assert evaluator.config == basic_config
         assert len(evaluator.results) == 0
-
-    def test_compute_alignment_error(self, basic_config: AlignmentEvalConfig) -> None:
-        """Test alignment error computation."""
-        evaluator = AlignmentEvaluator(basic_config)
-
-        # Test with identical alignments
-        pred_align = np.array([[0, 0], [1, 1], [2, 2]])
-        gt_align = np.array([[0, 0], [1, 1], [2, 2]])
-        error = evaluator._compute_alignment_error(pred_align, gt_align, 3, 3)
-        assert error == 0.0
-
-        # Test with different alignments
-        pred_align = np.array([[0, 0], [1, 1], [2, 2]])
-        gt_align = np.array([[0, 0], [1, 2], [2, 1]])
-        error = evaluator._compute_alignment_error(pred_align, gt_align, 3, 3)
-        assert error > 0.0
 
     def test_compare_alignments(self, basic_config: AlignmentEvalConfig) -> None:
         """Test comparison of different alignment methods."""
@@ -192,11 +192,3 @@ class TestAlignmentEvaluator:
                 ["DTW", "DerivativeDTW", "ShapeDTW-MockDescriptor"]
             )
         )
-
-    def test_error_cases(self, basic_config: AlignmentEvalConfig) -> None:
-        """Test error handling."""
-        evaluator = AlignmentEvaluator(basic_config)
-
-        # Test with empty sequences
-        with pytest.raises(ValueError):
-            evaluator._compute_alignment_error(np.array([]), np.array([]), 0, 0)

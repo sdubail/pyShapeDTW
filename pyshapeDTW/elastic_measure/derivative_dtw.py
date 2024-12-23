@@ -1,3 +1,5 @@
+from typing import Optional, Tuple
+
 import numpy as np
 import numpy.typing as npt
 from dtw import dtw
@@ -8,33 +10,32 @@ from pyshapeDTW.elastic_measure.warping import wpath2mat
 
 class DerivativeDTW:
     def __init__(
-        self, sequence1, sequence2, metric: str = "euclidean", step_pattern="symmetric2"
-    ):
+        self, metric: str = "euclidean", step_pattern: str = "symmetric2"
+    ) -> None:
         """
-        Initialize with two time series sequences.
+        Initialize DTW parameters.
 
         Args:
-            sequence1: m1 x n numpy array
-            sequence2: m2 x n numpy array
+            metric: Distance metric to use for DTW computation
+            step_pattern: Step pattern for DTW warping path
         """
-        self.sequence1 = sequence1
-        self.sequence2 = sequence2
         self.metric: str = metric
         self.step_pattern: str = step_pattern
-        self._validate_input()
 
-    def _validate_input(self):
+    def _validate_input(
+        self, sequence1: npt.NDArray[np.float64], sequence2: npt.NDArray[np.float64]
+    ) -> None:
         """Validate input time series."""
         if (
-            self.sequence1 is None
-            or self.sequence2 is None
-            or len(self.sequence1) == 0
-            or len(self.sequence2) == 0
+            sequence1 is None
+            or sequence2 is None
+            or len(sequence1) == 0
+            or len(sequence2) == 0
         ):
             raise ValueError("Input two univariate/multivariate time series instances.")
 
-        len1, dims1 = self.sequence1.shape
-        len2, dims2 = self.sequence2.shape
+        len1, dims1 = sequence1.shape
+        len2, dims2 = sequence2.shape
 
         if len1 < dims1 or len2 < dims2:
             raise ValueError(
@@ -44,15 +45,14 @@ class DerivativeDTW:
         if dims1 != dims2:
             raise ValueError("Two time series should have the same dimensions.")
 
-    def calcKeoghGradient1D(self, sequence):
+    def calcKeoghGradient1D(
+        self, sequence: npt.NDArray[np.float64]
+    ) -> npt.NDArray[np.float64]:
         """
         Calculate gradient as defined by Keogh, 2001.
 
         Gradient formula:
             grad(q_i) = [(q_i - q_{i-1}) + (q_{i+1} - q_{i-1}) / 2] / 2
-
-        To ensure the gradient sequence has the same length as the original,
-        the sequence is padded at both ends.
 
         Args:
             sequence: 1D numpy array representing the time series.
@@ -70,16 +70,18 @@ class DerivativeDTW:
             )
 
         # Pad the sequence at both ends
-        seq_pad = np.pad(sequence, (1, 1), mode="edge")
+        seq_pad: npt.NDArray[np.float64] = np.pad(sequence, (1, 1), mode="edge")
 
         # Calculate gradients
-        seq_grad = (
+        seq_grad: npt.NDArray[np.float64] = (
             (seq_pad[1:-1] - seq_pad[:-2]) + (seq_pad[2:] - seq_pad[:-2]) / 2
         ) / 2
 
         return seq_grad
 
-    def calcKeoghGradient(self, sequence):
+    def calcKeoghGradient(
+        self, sequence: npt.NDArray[np.float64]
+    ) -> npt.NDArray[np.float64]:
         """
         Usable for both univariate and multivariate time series.
 
@@ -103,7 +105,7 @@ class DerivativeDTW:
                 "Each dimension of the time series should be organized column-wise."
             )
 
-        grads = []
+        grads: list[npt.NDArray[np.float64]] = []
 
         for i in range(dims):
             # Compute gradient for each dimension using calcKeoghGradient1D
@@ -111,8 +113,7 @@ class DerivativeDTW:
             grads.append(grad)
 
         # Combine gradients for all dimensions column-wise
-        grads = np.column_stack(grads)
-        return grads
+        return np.column_stack(grads)
 
     def _compute_aligned_distance(
         self,
@@ -140,30 +141,28 @@ class DerivativeDTW:
 
         return float(np.sqrt(np.sum((warped_p - warped_q) ** 2)))
 
-    def compute(self):
+    def __call__(
+        self, sequence1: npt.NDArray[np.float64], sequence2: npt.NDArray[np.float64]
+    ) -> tuple[float, float, npt.NDArray[np.int64]]:
         """
         Perform derivative DTW computation.
 
-        Returns:
-            dDerivative: Cumulative distances along the warping path
-                         (calculated among derivatives)
-            dRaw: Cumulative distances along the warping path
-                  (calculated among raw sequences)
-            Match: px2 matrix, the warping path
+        Args:
+            sequence1: First time series (m1 x n numpy array)
+            sequence2: Second time series (m2 x n numpy array)
 
         Returns:
-            raw_distance: Distance between aligned raw sequences
-            shape_distance: DTW distance using shape descriptors
-            path_length: Length of optimal warping path
-            match: Optimal warping path as indices array
-
+            Tuple containing:
+                dDerivative: DTW distance using shape descriptors
+                dRaw: Distance between aligned raw sequences
+                match: Optimal warping path as indices array
         """
-        p = self.sequence1
-        q = self.sequence2
+        # Validate input
+        self._validate_input(sequence1, sequence2)
 
         # 1. Calculate derivatives
-        grads_p = self.calcKeoghGradient(p)
-        grads_q = self.calcKeoghGradient(q)
+        grads_p = self.calcKeoghGradient(sequence1)
+        grads_q = self.calcKeoghGradient(sequence2)
 
         # 2. Run DTW
         alignment = dtw(
@@ -179,12 +178,8 @@ class DerivativeDTW:
             (alignment.index1, alignment.index2)
         ).astype(np.int64)
 
-        # Cumulative distances along the warping path (calculated among derivatives)
-        dDerivative = self._compute_aligned_distance(
-            grads_p, grads_q, match
-        )  # alignment.costMatrix
-
-        # compute distance using raw signals, instead of descriptor distances
-        dRaw = self._compute_aligned_distance(p, q, match)
+        # Cumulative distances along the warping path
+        dDerivative = self._compute_aligned_distance(grads_p, grads_q, match)
+        dRaw = self._compute_aligned_distance(sequence1, sequence2, match)
 
         return dDerivative, dRaw, match

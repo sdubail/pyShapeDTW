@@ -135,4 +135,5 @@ def test_call(
     assert match.shape[0] > 0
     assert np.isclose(dDerivative, 0.0)
     assert np.isclose(dRaw, 0.0)
+
     assert_array_almost_equal(match, match_exact)

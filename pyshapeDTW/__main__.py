@@ -143,6 +143,7 @@ def ucr_alignment(
         dataset_names=dataset_names,
         n_pairs_per_dataset=n_pairs_per_dataset,
         results_dir=Path("pyshapeDTW/results"),
+        descriptors={"HOG1D": HOG1D(), "Wavelets": DWT()},
     )
 
     evaluator = AlignmentEvaluator(config)

@@ -24,8 +24,17 @@ class DerivativeDTW:
 
     def _validate_input(
         self, sequence1: npt.NDArray[np.float64], sequence2: npt.NDArray[np.float64]
-    ) -> None:
-        """Validate input time series."""
+    ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
+        """
+        Validate input time series and ensure 2D shape.
+
+        Args:
+            sequence1: First time series
+            sequence2: Second time series
+
+        Returns:
+            Tuple of validated sequences reshaped to (n,1) if 1D
+        """
         if (
             sequence1 is None
             or sequence2 is None
@@ -34,8 +43,12 @@ class DerivativeDTW:
         ):
             raise ValueError("Input two univariate/multivariate time series instances.")
 
-        len1, dims1 = sequence1.shape
-        len2, dims2 = sequence2.shape
+        # Only reshape if 1D, preserve original shape if already 2D
+        sequence1_2d = sequence1.reshape(-1, 1) if sequence1.ndim == 1 else sequence1
+        sequence2_2d = sequence2.reshape(-1, 1) if sequence2.ndim == 1 else sequence2
+
+        len1, dims1 = sequence1_2d.shape
+        len2, dims2 = sequence2_2d.shape
 
         if len1 < dims1 or len2 < dims2:
             raise ValueError(
@@ -44,6 +57,8 @@ class DerivativeDTW:
 
         if dims1 != dims2:
             raise ValueError("Two time series should have the same dimensions.")
+
+        return sequence1_2d, sequence2_2d
 
     def calcKeoghGradient1D(
         self, sequence: npt.NDArray[np.float64]
@@ -157,8 +172,8 @@ class DerivativeDTW:
                 dRaw: Distance between aligned raw sequences
                 match: Optimal warping path as indices array
         """
-        # Validate input
-        self._validate_input(sequence1, sequence2)
+        # Validate input and ensure 2D shape
+        sequence1, sequence2 = self._validate_input(sequence1, sequence2)
 
         # 1. Calculate derivatives
         grads_p = self.calcKeoghGradient(sequence1)

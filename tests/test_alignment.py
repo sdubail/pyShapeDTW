@@ -142,7 +142,7 @@ class TestAlignmentEvaluator:
         # Check results structure
         assert isinstance(results, list)
         assert (
-            len(results) == 2
+            len(results) == 3
         )  # DTW and ShapeDTW-MockDescriptor / DerivativeDTW excluded for now, pass from 2 to 3 when added back
 
         # Check result contents
@@ -168,7 +168,7 @@ class TestAlignmentEvaluator:
         expected_results = (
             basic_config.n_pairs_per_dataset
             * len(basic_config.stretch_percentages)
-            * 2  # DTW + ShapeDTW-MockDescriptor / DerivativeDTW excluded for now, pass from 2 to 3 when added back
+            * 3  # DTW + ShapeDTW-MockDescriptor / DerivativeDTW excluded for now, pass from 2 to 3 when added back
         )
         assert len(evaluator.results) == expected_results
 

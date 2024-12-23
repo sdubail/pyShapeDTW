@@ -49,13 +49,12 @@ class UCRDataset:
 
         # Load data using tslearn's cache
         X_train, y_train, X_test, y_test = self.loader.load_dataset(dataset_name)
-
         if X_train is None:
             raise ValueError(f"Failed to load dataset {dataset_name}")
 
         # Select split
         X = X_train if split == "train" else X_test
-        y = y_train if split == "test" else y_test
+        y = y_train if split == "train" else y_test
 
         # Remove singleton dimension if univariate
         if X.shape[2] == 1:

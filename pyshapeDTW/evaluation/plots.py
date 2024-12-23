@@ -122,3 +122,46 @@ def plot_alignment_eval(results_df: pd.DataFrame) -> plt.Figure:
     ax.grid(True)
 
     return fig
+
+
+def plot_classification_comparison(results_df: pd.DataFrame) -> plt.Figure:
+    """Plot shapeDTW vs DTW classification accuracies.
+
+    Args:
+        results_df: DataFrame containing classification results
+
+    Returns:
+        fig: Matplotlib figure
+    """
+    fig, ax = plt.subplots(figsize=(10, 10))
+
+    # Get DTW accuracies
+    dtw_results = results_df[results_df["method"] == "DTW"]
+
+    # Plot each shapeDTW variant
+    shape_methods = [m for m in results_df["method"].unique() if m != "DTW"]
+
+    for method in shape_methods:
+        shape_results = results_df[results_df["method"] == method]
+        merged = pd.merge(
+            dtw_results, shape_results, on="dataset", suffixes=("_dtw", "_shape")
+        )
+
+        ax.scatter(
+            merged["accuracy_dtw"], merged["accuracy_shape"], label=method, alpha=0.6
+        )
+
+    # Add diagonal line
+    lims = [
+        min(ax.get_xlim()[0], ax.get_ylim()[0]),
+        max(ax.get_xlim()[1], ax.get_ylim()[1]),
+    ]
+    ax.plot(lims, lims, "k--", alpha=0.5, zorder=0)
+
+    ax.set_xlabel("DTW Accuracy")
+    ax.set_ylabel("ShapeDTW Accuracy")
+    ax.set_title("Classification Performance Comparison")
+    ax.grid(True, alpha=0.3)
+    ax.legend()
+
+    return fig

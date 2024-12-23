@@ -153,6 +153,9 @@ class ShapeDTW:
         n_samples: int = len(seq)
         half_len: int = self.seqlen // 2
 
+        if seq.ndim == 1:
+            seq = seq.reshape(-1, 1)
+
         subsequences: list[npt.NDArray[np.float64]] = []
         for i in range(n_samples):
             # Handle boundary conditions
@@ -167,7 +170,9 @@ class ShapeDTW:
                 pad_left: int = max(0, half_len - i)
                 pad_right: int = max(0, half_len - (n_samples - (i + 1)))
 
-                subseq = np.pad(subseq, ((pad_left, pad_right), (0, 0)), mode="edge")
+                pad_width = [(pad_left, pad_right)] + [(0, 0)] * (seq.ndim - 1)
+
+                subseq = np.pad(subseq, pad_width, mode="edge")
 
             subsequences.append(subseq)
 

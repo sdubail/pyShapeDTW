@@ -20,7 +20,15 @@ from pyshapeDTW.evaluation.alignment import (
     simulate_smooth_curve,
     stretching_ts,
 )
-from pyshapeDTW.evaluation.plots import plot_alignment_eval, plot_warped_ts
+from pyshapeDTW.evaluation.classification import (
+    ClassificationEvalConfig,
+    ClassificationEvaluator,
+)
+from pyshapeDTW.evaluation.plots import (
+    plot_alignment_eval,
+    plot_classification_comparison,
+    plot_warped_ts,
+)
 
 app = typer.Typer()
 
@@ -153,6 +161,47 @@ def ucr_alignment(
     fig = plot_alignment_eval(results_df)
     fig.savefig(config.results_dir / "alignment_results.png")
     results_df.to_csv(config.results_dir / "alignment_results.csv", index=False)
+
+
+@app.command("ucr-classification")
+def ucr_classification(
+    dataset_names: list[str] | None = None,
+) -> None:
+    """Run classification evaluation on UCR datasets comparing DTW and shapeDTW."""
+    if dataset_names is None:
+        dataset_names = ["GunPoint", "ECG200", "Coffee"]  # Example datasets
+
+    # Setup descriptors with parameters from paper
+    descriptors = {
+        "HOG1D": HOG1D(
+            HOG1DParams(
+                n_bins=8,
+                cells=(1, 25),  # Two non-overlapping intervals
+                overlap=0,
+                scale=0.1,
+            )
+        ),
+        "PAA": PAA(PAAParams(seg_num=5)),  # 5 equal-length intervals
+        "DWT": DWT(DWTParams()),  # Default params as in paper
+    }
+
+    # Configure evaluation
+    config = ClassificationEvalConfig(
+        dataset_names=dataset_names,
+        descriptors=descriptors,
+        seqlen=30,  # As specified in paper
+        results_dir=Path("pyshapeDTW/results"),
+    )
+
+    # Run evaluation
+    evaluator = ClassificationEvaluator(config)
+    results_df = evaluator.run_evaluation()
+
+    # Plot results
+    fig = plot_classification_comparison(results_df)
+
+    results_df.to_csv(config.results_dir / "classification_results.csv", index=False)
+    fig.savefig(config.results_dir / "classification_comparison.png")
 
 
 if __name__ == "__main__":

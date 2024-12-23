@@ -252,20 +252,20 @@ class AlignmentEvaluator:
         )
 
         # # Derivative DTW
-        # dedtw = DerivativeDTW(original, transformed)
-        # _, _, dedtw_match = dedtw.compute()
-        # dedtw_error = self._compute_alignment_error(
-        #     dedtw_match, gt_align, len(original), len(transformed)
-        # )
+        dedtw = DerivativeDTW()
+        _, _, dedtw_match = dedtw(original, transformed)
+        dedtw_error = compute_alignment_error(
+            dedtw_match, gt_align, len(original), len(transformed)
+        )
 
-        # results.append(
-        #     {
-        #         "dataset": dataset_name,
-        #         "method": "DerivativeDTW",
-        #         "stretch_pct": stretch_pct,
-        #         "error": dedtw_error,
-        #     }
-        # )
+        results.append(
+            {
+                "dataset": dataset_name,
+                "method": "DerivativeDTW",
+                "stretch_pct": stretch_pct,
+                "error": dedtw_error,
+            }
+        )
 
         # ShapeDTW with different descriptors
         sdtw = ShapeDTW(seqlen=20)

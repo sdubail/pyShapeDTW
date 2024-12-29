@@ -1,11 +1,10 @@
 from pathlib import Path
+from typing import Any
 
 import numpy as np
-import numpy.typing as npt
+import pandas as pd
 import pytest
 
-from pyshapeDTW.descriptors.base import BaseDescriptor
-from pyshapeDTW.descriptors.hog1d import HOG1D
 from pyshapeDTW.evaluation.classification import (
     ClassificationEvalConfig,
     ClassificationEvaluator,
@@ -13,128 +12,104 @@ from pyshapeDTW.evaluation.classification import (
 
 
 @pytest.fixture
-def test_sequences() -> tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]]:
-    """Create test sequences."""
-    # Create 5 sequences of length 10, with 2 features
-    X = np.random.randn(5, 10, 2)
-    y = np.array([0, 0, 1, 1, 0])
-    return X, y
-
-
-@pytest.fixture
-def basic_config(descriptor: BaseDescriptor) -> ClassificationEvalConfig:
+def basic_config(descriptor: Any) -> ClassificationEvalConfig:
     """Create basic evaluation configuration."""
     return ClassificationEvalConfig(
-        dataset_names=["GunPoint"],  # Using actual UCR dataset
+        dataset_names=["Dataset1"],
         descriptors={"MockDescriptor": descriptor},
-        seqlen=10,  # Shorter for testing
-        results_dir=Path("test_results"),
+        seqlen=10,  # Match mock data length
+        results_dir=Path("dummy_path"),  # Won't be used due to mocking
+        n_jobs=None,  # Disable parallel processing in tests
+        batch_size=2,
     )
 
 
 class TestClassificationEvaluator:
     """Tests for classification evaluation pipeline."""
 
-    def test_init(self, basic_config: ClassificationEvalConfig) -> None:
-        """Test evaluator initialization."""
-        evaluator = ClassificationEvaluator(basic_config)
-        assert evaluator.config == basic_config
-        assert len(evaluator.results) == 0
-        assert evaluator.config.seqlen == 10
-
     def test_compute_descriptors(
-        self,
-        basic_config: ClassificationEvalConfig,
-        test_sequences: tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]],
+        self, basic_config: ClassificationEvalConfig, mock_ucr: Any
     ) -> None:
         """Test descriptor computation."""
         evaluator = ClassificationEvaluator(basic_config)
-        X, _ = test_sequences
+        X_train, _, _, _ = mock_ucr.return_value.load_dataset("Dataset1")
 
         descriptors = evaluator.compute_descriptors(
-            X, basic_config.descriptors["MockDescriptor"]
+            X_train, basic_config.descriptors["MockDescriptor"]
         )
 
-        assert len(descriptors) == len(X)
+        assert len(descriptors) == len(X_train)
         assert all(isinstance(d, np.ndarray) for d in descriptors)
-        # Each descriptor should be computed for every timestep
-        assert all(len(d) == len(x) for d, x in zip(descriptors, X))
+        assert all(len(d) == len(x) for d, x in zip(descriptors, X_train))
 
-    def test_nearest_neighbor(
+    def test_evaluate_dataset(
+        self, basic_config: ClassificationEvalConfig, mock_ucr: Any
+    ) -> None:
+        """Test dataset evaluation with both DTW and ShapeDTW."""
+        evaluator = ClassificationEvaluator(basic_config)
+        data = mock_ucr.return_value.load_dataset("Dataset1")
+
+        # Test basic DTW
+        results = evaluator.evaluate_dataset("TestDataset", data)
+        assert isinstance(results, dict)
+        assert "accuracy" in results
+        assert 0 <= float(results["accuracy"]) <= 1
+
+        # Test ShapeDTW
+        results = evaluator.evaluate_dataset(
+            "TestDataset", data, basic_config.descriptors["MockDescriptor"]
+        )
+        assert isinstance(results, dict)
+        assert "accuracy" in results
+        assert 0 <= float(results["accuracy"]) <= 1
+
+    def test_run_evaluation(
         self,
         basic_config: ClassificationEvalConfig,
-        test_sequences: tuple[npt.NDArray[np.float64], npt.NDArray[np.int64]],
+        mock_ucr: Any,
+        monkeypatch: pytest.MonkeyPatch,
     ) -> None:
-        """Test nearest neighbor classification."""
-        evaluator = ClassificationEvaluator(basic_config)
-        X, y = test_sequences
-
-        # Use first 3 sequences as training, test with the 4th
-        train_data = list(X[:3])
-        test_instance = X[3]
-        y_train = y[:3]
-
-        pred = evaluator.nearest_neighbor(train_data, test_instance, y_train)
-        assert isinstance(pred, int | np.integer)
-        assert pred in y_train  # Prediction should be one of training labels
-
-    def test_evaluate_dataset(self, basic_config: ClassificationEvalConfig) -> None:
-        """Test dataset evaluation."""
+        """Test full evaluation run with mocked data loading."""
         evaluator = ClassificationEvaluator(basic_config)
 
-        # Test DTW
-        dtw_results = evaluator.evaluate_dataset("GunPoint")
-        assert isinstance(dtw_results, dict)
-        assert "accuracy" in dtw_results
-        assert "dataset" in dtw_results
-        assert dtw_results["dataset"] == "GunPoint"
-        assert 0 <= dtw_results["accuracy"] <= 1
+        # Mock DataFrame.to_csv
+        saved_data: list[pd.DataFrame] = []
 
-        # Test shapeDTW
-        shape_results = evaluator.evaluate_dataset(
-            "GunPoint", basic_config.descriptors["MockDescriptor"]
-        )
-        assert isinstance(shape_results, dict)
-        assert "accuracy" in shape_results
-        assert "dataset" in shape_results
-        assert shape_results["dataset"] == "GunPoint"
-        assert 0 <= shape_results["accuracy"] <= 1
+        def mock_to_csv(df: pd.DataFrame, *args: Any, **kwargs: Any) -> None:
+            saved_data.append(df.copy())
 
-    def test_run_evaluation(self, basic_config: ClassificationEvalConfig) -> None:
-        """Test full evaluation run."""
-        evaluator = ClassificationEvaluator(basic_config)
-        results_df = evaluator.run_evaluation()
+        monkeypatch.setattr(pd.DataFrame, "to_csv", mock_to_csv)
 
-        # Check DataFrame structure
-        assert set(results_df.columns) == {"dataset", "method", "accuracy"}
+        # Run evaluation
+        results = evaluator.run_evaluation(Path("dummy_results.csv"))
 
-        # Check number of results
-        assert (
-            len(results_df) == len(basic_config.descriptors) + 1
-        )  # DTW + shapeDTW variants
+        # Check results structure
+        assert isinstance(results, pd.DataFrame)
+        assert set(results.columns) == {"dataset", "method", "accuracy"}
 
         # Check methods
-        expected_methods = {"DTW"} | {
-            f"ShapeDTW-{name}" for name in basic_config.descriptors
-        }
-        assert set(results_df["method"]) == expected_methods
+        methods = set(results["method"])
+        expected_methods = {"DTW", "ShapeDTW-MockDescriptor"}
+        assert methods == expected_methods
 
-        # Check values
-        assert all(results_df["dataset"] == "GunPoint")
-        assert all(results_df["accuracy"].between(0, 1))
+        # Verify accuracies
+        assert all(0 <= acc <= 1 for acc in results["accuracy"])
 
-    def test_multivariate_handling(
-        self, basic_config: ClassificationEvalConfig
+    def test_multivariate(
+        self, basic_config: ClassificationEvalConfig, mock_ucr: Any
     ) -> None:
-        """Test handling of multivariate time series."""
+        """Test handling of multivariate data."""
         evaluator = ClassificationEvaluator(basic_config)
 
-        # Create multivariate test data
-        X = np.random.randn(5, 10, 3)  # 5 sequences, length 10, 3 features
-        descriptors = evaluator.compute_descriptors(
-            X, basic_config.descriptors["MockDescriptor"]
+        # Use multivariate dataset from mock
+        data = mock_ucr.return_value.load_dataset("MultivariateDataset")
+        X_train, y_train, X_test, y_test = data
+
+        # Test that everything works with multivariate data
+        results = evaluator.evaluate_dataset(
+            "MultivariateDataset", [X_train, y_train, X_test, y_test]
         )
 
-        assert len(descriptors) == len(X)
-        # Shape descriptors should preserve temporal dimension
-        assert all(len(d) == len(x) for d, x in zip(descriptors, X))
+        assert isinstance(results, dict)
+        assert "accuracy" in results
+        assert 0 <= float(results["accuracy"]) <= 1

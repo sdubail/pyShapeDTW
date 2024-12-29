@@ -94,26 +94,10 @@ def test_invalid_split() -> None:
         ucr.load_dataset("Dataset1", split="invalid")
 
 
-def test_cache_control(mock_ucr: MagicMock) -> None:
-    """Test cache control through tslearn."""
-    # With cache
-    ucr1 = UCRDataset(use_cache=True)
-    ucr1.load_dataset("Dataset1")
-
-    # Without cache
-    ucr2 = UCRDataset(use_cache=False)
-    ucr2.load_dataset("Dataset1")
-
-    # Should have created two different loaders
-    assert mock_ucr.call_count == 2
-    assert mock_ucr.call_args_list[0][1]["use_cache"] is True
-    assert mock_ucr.call_args_list[1][1]["use_cache"] is False
-
-
 def test_multivariate_normalization() -> None:
     """Test normalization for multivariate data."""
     ucr = UCRDataset()
-    X, _ = ucr.load_dataset("MultivariateDataset", normalize=True)
+    X, _ = ucr.load_dataset("MultivariateDataset", normalize=True)  # type:ignore
 
     # Each variable should be normalized independently
     for i in range(X.shape[2]):

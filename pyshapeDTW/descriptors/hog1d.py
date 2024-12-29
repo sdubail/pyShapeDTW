@@ -40,7 +40,7 @@ class HOG1D(BaseDescriptor):
             params: Parameters for HOG1D computation
         """
         self.params = params or HOG1DParams()
-
+        self.handles_multivariate = False
         # Precompute angle bins
         if self.params.signed:
             self.angles = np.linspace(
@@ -65,6 +65,9 @@ class HOG1D(BaseDescriptor):
         """
         # Validate input
         seq = self._validate_input(subsequence)
+        # Handle multivariate case
+        if seq.shape[1] > 1:
+            return self._compute_multivariate_hog1d(seq)
 
         # Compute gradients
         grads, angles = self._compute_gradients(seq)
@@ -161,3 +164,21 @@ class HOG1D(BaseDescriptor):
             histogram /= norm
 
         return histogram
+
+    def _compute_multivariate_hog1d(
+        self, seq: npt.NDArray[np.float64]
+    ) -> npt.NDArray[np.float64]:
+        """Handle multivariate sequences.
+
+        Args:
+            seq: Multivariate input sequence (n_samples, n_features)
+
+        Returns:
+            descriptors: Concatenated HOG1D descriptors for each dimension
+        """
+        all_coeffs = []
+        for dim in range(seq.shape[1]):
+            dim_seq = seq[:, dim]
+            dim_coeffs = self(dim_seq.reshape(-1, 1))
+            all_coeffs.append(dim_coeffs)
+        return np.concatenate(all_coeffs)

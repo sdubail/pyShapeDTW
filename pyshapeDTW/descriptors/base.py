@@ -46,7 +46,5 @@ class BaseDescriptor(ABC):
         # Ensure 2D
         if arr.ndim == 1:
             arr = arr.reshape(-1, 1)
-        elif arr.ndim > 2:
-            raise ValueError("Input must be 1D or 2D array")
 
         return arr

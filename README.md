@@ -84,3 +84,12 @@ Detailed documentation is available in the docstrings. Each module is extensivel
 - Parameter specifications
 - Usage examples
 - Return value descriptions
+
+## 📊 UCR Datasets
+
+The UCR Time Series Classification Archive is a large collection of time series datasets widely used for benchmarking. Due to computational constraints, we've carefully curated two dataset lists:
+
+- `todo_datasets.csv`: A focused selection of the most computationally manageable datasets
+- `todo_datasets_extended.csv`: An expanded list that includes additional datasets while maintaining reasonable computation times
+
+This filtering approach retains approximately half of the original UCR archive, ensuring comprehensive evaluation while keeping computational requirements practical.

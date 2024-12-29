@@ -1,10 +1,15 @@
+import pickle
+from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
 import numpy as np
+import pandas as pd
 import typer
 from dtw import dtw
+from tqdm import tqdm
 
+from pyshapeDTW.data.ucr import UCRDataset
 from pyshapeDTW.descriptors.base import BaseDescriptor
 from pyshapeDTW.descriptors.hog1d import HOG1D, HOG1DParams
 from pyshapeDTW.descriptors.paa import PAA, PAAParams
@@ -140,39 +145,140 @@ def simulate_alignments(
 
 @app.command("ucr-alignment")
 def ucr_alignment(
-    dataset_names: list[str] | None = None, n_pairs_per_dataset: int = 5
+    dataset_file: Path = typer.Option(
+        "pyshapeDTW/data/todo_datasets.csv",
+        help="File containing dataset names",
+    ),
+    n_pairs_per_dataset: int = typer.Option(
+        5, help="Number of pairs to sample per dataset"
+    ),
+    stretch_min: float = typer.Option(0.1, help="Minimum stretch percentage"),
+    stretch_max: float = typer.Option(0.5, help="Maximum stretch percentage"),
+    stretch_steps: int = typer.Option(5, help="Number of stretch percentage steps"),
+    stretch_amt: int = typer.Option(2, help="Maximum stretch amount"),
+    scale_min: float = typer.Option(0.4, help="Minimum scaling factor"),
+    scale_max: float = typer.Option(1.0, help="Maximum scaling factor"),
+    results_dir: Path = typer.Option(
+        Path("pyshapeDTW/results"), help="Directory to save results"
+    ),
 ) -> None:
-    ### Plenty of additionnal arguments to add (streching, scaling...)
+    """Compare DTW and ShapeDTW alignments on UCR datasets."""
+    # if dataset_names is None:
+    #     dataset_names = ["GunPoint", "ECG200", "Coffee"]
+    dataset_names = pd.read_csv(dataset_file, header=0)["dataset"].to_list()
+    typer.echo(f"Looking at {len(dataset_names)} datasets from {dataset_file}")
 
-    if dataset_names is None:
-        dataset_names = ["GunPoint", "ECG200", "Coffee"]
+    # Create stretch percentages list
+    stretch_percentages = np.linspace(stretch_min, stretch_max, stretch_steps).tolist()
+
+    # Create results directory if it doesn't exist
+    results_dir = Path(results_dir)
+    results_dir.mkdir(parents=True, exist_ok=True)
+
+    # Setup descriptors with parameters from paper
+    descriptors: dict[str, BaseDescriptor] = {
+        "HOG1D": HOG1D(
+            HOG1DParams(
+                n_bins=8,
+                cells=(1, 25),  # Two non-overlapping intervals
+                overlap=0,
+                scale=0.1,
+            )
+        ),
+        "PAA": PAA(PAAParams(seg_num=5)),  # 5 equal-length intervals
+        "DWT": DWT(DWTParams()),  # Default params as in paper
+    }
 
     config = AlignmentEvalConfig(
         dataset_names=dataset_names,
         n_pairs_per_dataset=n_pairs_per_dataset,
-        results_dir=Path("pyshapeDTW/results"),
-        descriptors={"HOG1D": HOG1D(), "Wavelets": DWT()},
+        stretch_percentages=stretch_percentages,
+        stretch_amount=stretch_amt,
+        scale_range=(scale_min, scale_max),
+        results_dir=results_dir,
+        descriptors=descriptors,
     )
 
+    # Run evaluation
     evaluator = AlignmentEvaluator(config)
-    results_df = evaluator.run_evaluation()
+    results_df, best_alignments = evaluator.run_evaluation()
 
-    # Plot and save results
+    # Save numerical results
+    results_df.to_csv(results_dir / "alignment_results_full.csv", index=False)
+
+    # Save best alignment samples using pickle
+    with open(results_dir / "best_alignments_full.pkl", "wb") as f:
+        pickle.dump(best_alignments, f)
+
+    # Create summary of best alignments
+    summary_rows = [
+        {
+            "dataset": sample.dataset,
+            "error_gap": sample.error_gap,
+            "stretch_pct": sample.stretch_pct,
+            "descriptor": sample.descriptor_name,
+            "orig_len": len(sample.original),
+            "transform_len": len(sample.transformed),
+        }
+        for sample in best_alignments
+    ]
+
+    summary_df = pd.DataFrame(summary_rows)
+    summary_df.to_csv(results_dir / "best_alignments_summary_full.csv", index=False)
+
+    # Plot overall results
     fig = plot_alignment_eval(results_df)
-    fig.savefig(config.results_dir / "alignment_results.png")
-    results_df.to_csv(config.results_dir / "alignment_results.csv", index=False)
+    fig.savefig(results_dir / "alignment_results_full.png")
+
+    # Create plots for best aligments samples
+    fig_dtw = plt.figure(figsize=(15, 12))
+    fig_shape = plt.figure(figsize=(15, 12))
+
+    # Plot random one
+    fig_dtw = plot_warped_ts(
+        best_alignments[0].original,
+        best_alignments[0].transformed,
+        best_alignments[0].dtw_match,
+        fig_dtw,
+    )
+    # Plot ShapeDTW results
+    if best_alignments[0].shapedtw_match is not None:
+        fig_shape = plot_warped_ts(
+            best_alignments[0].original,
+            best_alignments[0].transformed,
+            best_alignments[0].shapedtw_match,
+            fig_shape,
+        )
+    plt.tight_layout()
+    fig_dtw.savefig(results_dir / "warped_dtw.png")
+    fig_shape.savefig(results_dir / "warped_sdtw.png")
+
+    # Print summary
+    typer.echo(f"\nResults saved to: {results_dir}")
+    typer.echo("\nBest alignment gaps per dataset:")
+    for _, row in summary_df.sort_values("error_gap", ascending=False).iterrows():
+        typer.echo(
+            f"{row['dataset']}: {row['error_gap']:.4f} "
+            f"(stretch={row['stretch_pct']:.2f}, descriptor={row['descriptor']})"
+        )
 
 
 @app.command("ucr-classification")
 def ucr_classification(
-    dataset_names: list[str] | None = None,
+    dataset_file: Path = typer.Option(
+        "pyshapeDTW/data/todo_datasets.csv",
+        help="File containing dataset names",
+    ),
 ) -> None:
     """Run classification evaluation on UCR datasets comparing DTW and shapeDTW."""
-    if dataset_names is None:
-        dataset_names = ["GunPoint", "ECG200", "Coffee"]  # Example datasets
+
+    # dataset_names = ["CinCECGtorso"]  # ["GunPoint", "ECG200", "Coffee"]  # Example datasets
+    # dataset_names = np.loadtxt(dataset_file, dtype=str).tolist()
+    dataset_names = pd.read_csv(dataset_file, header=0)["dataset"].to_list()
+    typer.echo(f"Looking at {len(dataset_names)} datasets from {dataset_file}")
 
     # Setup descriptors with parameters from paper
-    descriptors = {
+    descriptors: dict[str, BaseDescriptor] = {
         "HOG1D": HOG1D(
             HOG1DParams(
                 n_bins=8,
@@ -195,13 +301,110 @@ def ucr_classification(
 
     # Run evaluation
     evaluator = ClassificationEvaluator(config)
-    results_df = evaluator.run_evaluation()
+    results_df = evaluator.run_evaluation(
+        path=config.results_dir / "classification_results_full_incremental.csv"
+    )
 
     # Plot results
     fig = plot_classification_comparison(results_df)
 
-    results_df.to_csv(config.results_dir / "classification_results.csv", index=False)
-    fig.savefig(config.results_dir / "classification_comparison.png")
+    results_df.to_csv(
+        config.results_dir / "classification_results_full.csv", index=False
+    )
+    fig.savefig(config.results_dir / "classification_comparison_full.png")
+
+
+@app.command("test-datasets")
+def test_dataset_availability(
+    dataset_file: Path = typer.Option(
+        "pyshapeDTW/data/ucr_datasets.txt", help="File containing dataset names"
+    ),
+    output_file: Path = typer.Option(
+        "pyshapeDTW/data/available_datasets.txt", help="Output file for results"
+    ),
+    show_sizes: bool = typer.Option(True, help="Show dataset sizes"),
+) -> None:
+    """Test which datasets from the list can be loaded successfully."""
+    # Load dataset names from file
+    dataset_names = np.loadtxt(dataset_file, dtype=str).tolist()
+    typer.echo(f"Testing {len(dataset_names)} datasets...\n")
+
+    # Initialize UCR dataset loader
+    ucr = UCRDataset()
+
+    available = []
+    unavailable = []
+    dataset_info = []
+
+    # Try loading each dataset
+    for name in tqdm(dataset_names):
+        try:
+            # Try to load both train and test splits
+            X_train, y_train = ucr.load_dataset(name, "train")
+            X_test, y_test = ucr.load_dataset(name, "test")
+            available.append(name)
+
+            # Get dataset size info
+            n_train = len(X_train)
+            n_test = len(X_test)
+            seq_length = X_train.shape[1]
+            total_points = (n_train + n_test) * seq_length
+            dataset_info.append(
+                {
+                    "name": name,
+                    "n_train": n_train,
+                    "n_test": n_test,
+                    "seq_length": seq_length,
+                    "total_points": total_points,
+                }
+            )
+        except Exception as e:
+            unavailable.append((name, str(e)))
+
+    # Print results
+    typer.echo("\nResults:")
+
+    if show_sizes:
+        # Sort by total number of points
+        dataset_info.sort(key=lambda x: x["total_points"], reverse=True)
+        typer.echo("\nDataset Sizes (sorted by total points):")
+        for info in dataset_info:
+            typer.echo(
+                f"  {info['name']:<30} "
+                f"Train: {info['n_train']:>5}, "
+                f"Test: {info['n_test']:>5}, "
+                f"Length: {info['seq_length']:>5}, "
+                f"Total Points: {info['total_points']:>10,}"
+            )
+
+    # Write available datasets with info to file
+    with open(output_file, "w") as f:
+        # Write header
+        f.write("name\tn_train\tn_test\tseq_length\ttotal_points\n")
+        # Write data
+        for info in dataset_info:
+            f.write(
+                f"{info['name']}\t{info['n_train']}\t{info['n_test']}\t{info['seq_length']}\t{info['total_points']}\n"
+            )
+
+    # Print summary
+    typer.echo(f"\nAvailable datasets ({len(available)}/{len(dataset_names)}):")
+    for name in available:
+        typer.echo(f"  ✓ {name}")
+
+    if unavailable:
+        typer.echo(f"\nUnavailable datasets ({len(unavailable)}/{len(dataset_names)}):")
+        for name, error in unavailable:
+            typer.echo(f"  ✗ {name}: {error}")
+
+    # Also write unavailable datasets to separate file
+    with open(output_file.with_suffix(".errors.txt"), "w") as f:
+        for name, error in unavailable:
+            f.write(f"{name}\t{error}\n")
+
+    typer.echo(
+        f"\nResults saved to '{output_file}' and '{output_file.with_suffix('.errors.txt')}'"
+    )
 
 
 if __name__ == "__main__":

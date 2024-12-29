@@ -1,6 +1,7 @@
+import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, Optional
 
 import numpy as np
 import numpy.typing as npt
@@ -123,7 +124,8 @@ def scale_time_series(
     # Normalize scale curve to desired range
     normalized = (scale_curve - min(scale_curve)) / np.ptp(scale_curve)
     scale = normalized * (scale_range[1] - scale_range[0]) + scale_range[0]
-
+    if ts.ndim > 1 and scale_curve.ndim == 1:
+        scale = scale.reshape(-1, 1)
     return scale * ts
 
 
@@ -155,6 +157,20 @@ def compute_alignment_error(
 
 
 @dataclass
+class BestAlignmentSample:
+    """Stores best alignment sample data for a dataset."""
+
+    dataset: str
+    error_gap: float  # Difference between DTW and ShapeDTW error
+    original: npt.NDArray[np.float64]
+    transformed: npt.NDArray[np.float64]
+    dtw_match: npt.NDArray[np.int64]
+    shapedtw_match: npt.NDArray[np.int64] | None
+    stretch_pct: float
+    descriptor_name: str | None
+
+
+@dataclass
 class AlignmentEvalConfig:
     """Configuration for alignment evaluation."""
 
@@ -172,7 +188,8 @@ class AlignmentEvalConfig:
             "HOG1D": HOG1D(),
         }
     )
-    results_dir: Path = Path("../results")
+    seqlen: int = 30
+    results_dir: Path = Path("pyshapeDTW/results")
 
 
 class AlignmentEvaluator:
@@ -182,48 +199,6 @@ class AlignmentEvaluator:
         self.config = config
         self.ucr = UCRDataset()
 
-        # Initialize results storage
-        self.results: list[dict[str, Any]] = []
-
-    def evaluate_dataset(self, dataset_name: str) -> None:
-        """Evaluate alignment methods on a single dataset."""
-        # Load dataset
-        X, _ = self.ucr.load_dataset(dataset_name, normalize=True)
-
-        # Randomly select time series
-        indices = np.random.choice(
-            len(X), self.config.n_pairs_per_dataset, replace=False
-        )
-
-        for idx in tqdm(indices, desc=f"Processing {dataset_name}"):
-            original = X[idx]
-
-            # Generate scaling curve
-            scale_params = ScaleParams(
-                len=len(original),
-                max_derivative=self.config.max_derivative,
-                n_nest=self.config.n_nest,
-            )
-            scale = simulate_smooth_curve(scale_params)
-
-            # Apply scaling
-            scaled = scale_time_series(original, scale, self.config.scale_range)
-
-            # Test different stretch percentages
-            for stretch_pct in self.config.stretch_percentages:
-                # Apply stretching to scaled sequence
-                params = StretchParams(
-                    percentage=stretch_pct, amount=self.config.stretch_amount
-                )
-                sim_idx, gt_align = stretching_ts(len(scaled), params)
-                transformed = scaled[sim_idx]
-
-                # Compare different alignment methods
-                results = self._compare_alignments(
-                    original, transformed, gt_align, dataset_name, stretch_pct
-                )
-                self.results.extend(results)
-
     def _compare_alignments(
         self,
         original: np.ndarray,
@@ -231,8 +206,8 @@ class AlignmentEvaluator:
         gt_align: np.ndarray,
         dataset_name: str,
         stretch_pct: float,
-    ) -> list[dict[str, Any]]:
-        """Compare different alignment methods."""
+    ) -> tuple[list[dict[str, Any]], BestAlignmentSample]:
+        """Compare different alignment methods and return results and potential best sample."""
         results = []
 
         # Standard DTW
@@ -251,7 +226,7 @@ class AlignmentEvaluator:
             }
         )
 
-        # # Derivative DTW
+        # DerivativeDTW
         dedtw = DerivativeDTW()
         _, _, dedtw_match = dedtw(original, transformed)
         dedtw_error = compute_alignment_error(
@@ -267,8 +242,13 @@ class AlignmentEvaluator:
             }
         )
 
+        # Track best ShapeDTW result for this comparison
+        best_shapedtw_error = float("inf")
+        best_shapedtw_match = None
+        best_descriptor = None
+
         # ShapeDTW with different descriptors
-        sdtw = ShapeDTW(seqlen=20)
+        sdtw = ShapeDTW(seqlen=self.config.seqlen)
         for desc_name, descriptor in self.config.descriptors.items():
             _, _, _, sdtw_match = sdtw(original, transformed, descriptor)
             sdtw_error = compute_alignment_error(
@@ -284,11 +264,126 @@ class AlignmentEvaluator:
                 }
             )
 
-        return results
+            if sdtw_error < best_shapedtw_error:
+                best_shapedtw_error = sdtw_error
+                best_shapedtw_match = sdtw_match
+                best_descriptor = desc_name
 
-    def run_evaluation(self) -> pd.DataFrame:
-        """Run evaluation on all configured datasets."""
-        for dataset in self.config.dataset_names:
-            self.evaluate_dataset(dataset)
+        # Calculate error gap
+        error_gap = dtw_error - best_shapedtw_error
 
-        return pd.DataFrame(self.results)
+        # Create alignment sample
+        sample = BestAlignmentSample(
+            dataset=dataset_name,
+            error_gap=error_gap,
+            original=original,
+            transformed=transformed,
+            dtw_match=dtw_match,
+            shapedtw_match=best_shapedtw_match,
+            stretch_pct=stretch_pct,
+            descriptor_name=best_descriptor,
+        )
+
+        return results, sample
+
+    def evaluate_dataset(
+        self, dataset_name: str
+    ) -> tuple[list[dict[str, Any]], BestAlignmentSample]:
+        """Evaluate alignment methods on a single dataset."""
+        results: list[dict[str, Any]] = []
+        X, _ = self.ucr.load_dataset(dataset_name, normalize=True)  # type:ignore
+
+        # Track best sample for this dataset
+        best_sample: BestAlignmentSample | None = None
+
+        indices = np.random.choice(
+            len(X), len(X), replace=False
+        )  # in the end we don't use self.n_pairs_per_dataset but the whole dataset
+        # if using it, replace (len(X), len(X)) with (len(X), self.config.n_pairs_per_dataset)
+
+        for idx in tqdm(indices, desc=f"Processing {dataset_name}"):
+            original = X[idx]
+
+            # Generate scaling curve
+            scale_params = ScaleParams(
+                len=len(original),
+                max_derivative=self.config.max_derivative,
+                n_nest=self.config.n_nest,
+            )
+            scale = simulate_smooth_curve(scale_params)
+
+            # Apply scaling
+            scaled = scale_time_series(original, scale, self.config.scale_range)
+
+            for stretch_pct in self.config.stretch_percentages:
+                # Apply stretching to scaled sequence
+                params = StretchParams(
+                    percentage=stretch_pct, amount=self.config.stretch_amount
+                )
+                sim_idx, gt_align = stretching_ts(len(scaled), params)
+                transformed = scaled[sim_idx]
+
+                # Compare alignments and get potential best sample
+                new_results, sample = self._compare_alignments(
+                    original, transformed, gt_align, dataset_name, stretch_pct
+                )
+
+                # Update results
+                results.extend(new_results)
+
+                # Update best sample if we have a larger error gap
+                if best_sample is None or sample.error_gap > best_sample.error_gap:
+                    best_sample = sample
+        if best_sample is None:
+            raise ValueError(f"Best sample is None for dataset {dataset_name}")
+        return results, best_sample
+
+    def run_evaluation(self) -> tuple[pd.DataFrame, list[BestAlignmentSample]]:
+        """Run evaluation on all configured datasets with incremental saving."""
+        # Create results directory files
+        results_path = self.config.results_dir / "alignment_results_incremental.csv"
+        alignments_path = self.config.results_dir / "best_alignments_incremental.pkl"
+
+        # Load existing results if any
+        if results_path.exists():
+            existing_results = pd.read_csv(results_path)
+        else:
+            existing_results = pd.DataFrame(
+                columns=["dataset", "method", "stretch_pct", "error"]
+            )
+        # Load existing best alignments if any
+        if alignments_path.exists():
+            with open(alignments_path, "rb") as f:
+                best_alignments: list[BestAlignmentSample] = pickle.load(f)
+        else:
+            best_alignments = []
+        # Get already processed datasets
+        processed_datasets = existing_results["dataset"].unique()
+        for dataset in tqdm(self.config.dataset_names, desc="Processing datasets"):
+            if dataset in processed_datasets:
+                print(f"Skipping {dataset} - already processed")
+                continue
+
+            try:
+                print(f"\nEvaluating {dataset}")
+                results, best_sample = self.evaluate_dataset(dataset)
+
+                # Update results file
+                new_results = pd.concat(
+                    [existing_results, pd.DataFrame(results)], ignore_index=True
+                )
+                new_results.to_csv(results_path, index=False)
+
+                # Update existing results for next iteration
+                existing_results = new_results
+
+                # Update best alignments
+                best_alignments.append(best_sample)
+                with open(alignments_path, "wb") as f:
+                    pickle.dump(best_alignments, f)
+
+            except Exception as e:
+                print(f"Error while evaluating dataset {dataset}: {e!s}")
+                continue
+
+        return pd.DataFrame(existing_results), best_alignments

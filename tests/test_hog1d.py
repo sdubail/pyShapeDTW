@@ -138,3 +138,77 @@ def test_custom_parameters(
     expected_length = n_cells * custom_hog1d.params.n_bins
 
     assert len(desc) == expected_length
+
+
+def test_multivariate_hog1d(hog1d: HOG1D) -> None:
+    """Test HOG1D with multivariate input."""
+    # Create 2D sequence
+    t = np.linspace(0, 2 * np.pi, 100, dtype=np.float64)
+    seq_2d = np.column_stack([np.sin(t), np.cos(t)])
+
+    desc = hog1d(seq_2d)
+
+    # Should compute descriptor for each dimension
+    single_dim_desc = hog1d(seq_2d[:, 0])
+    assert len(desc) == 2 * len(single_dim_desc)
+
+
+def test_edge_cases(hog1d: HOG1D) -> None:
+    """Test HOG1D with edge cases."""
+    # Very short sequence
+    short_seq = np.array([1.0, 2.0], dtype=np.float64)
+    desc_short = hog1d(short_seq)
+    assert isinstance(desc_short, np.ndarray)
+
+    # Constant sequence
+    const_seq = np.ones(50, dtype=np.float64)
+    desc_const = hog1d(const_seq)
+    assert isinstance(desc_const, np.ndarray)
+
+    # Single value
+    single_val = np.array([1.0], dtype=np.float64)
+    desc_single = hog1d(single_val)
+    assert isinstance(desc_single, np.ndarray)
+
+
+def test_boundary_handling(hog1d: HOG1D) -> None:
+    """Test gradient computation at sequence boundaries."""
+    seq = np.array([1.0, 2.0, 3.0, 4.0, 5.0], dtype=np.float64)
+    grads, angles = hog1d._compute_gradients(seq)
+
+    # Should have same length as input
+    assert len(grads) == len(seq)
+    assert len(angles) == len(seq)
+
+    # Check boundary padding
+    assert grads[0] == grads[1]  # First gradient padded
+    assert grads[-1] == grads[-2]  # Last gradient padded
+
+
+def test_cell_boundary_handling(hog1d: HOG1D) -> None:
+    """Test cell computation at sequence boundaries."""
+    # Create sequence shorter than cell size
+    seq = np.array([1.0, 2.0, 3.0], dtype=np.float64)
+    desc = hog1d(seq)
+    assert isinstance(desc, np.ndarray)
+
+    # Create sequence exactly one cell size
+    seq_cell = np.ones(hog1d.params.cells[1], dtype=np.float64)
+    desc_cell = hog1d(seq_cell)
+    assert isinstance(desc_cell, np.ndarray)
+
+
+def test_histogram_binning_properties(hog1d: HOG1D) -> None:
+    """Test histogram binning properties."""
+    # Create sequence with known gradients
+    t = np.linspace(0, np.pi, 100, dtype=np.float64)
+    seq = np.sin(t)
+    desc = hog1d(seq)
+
+    # Reshape descriptor into cells
+    n_cells = len(desc) // hog1d.params.n_bins
+    histograms = desc.reshape(n_cells, hog1d.params.n_bins)
+
+    # Each histogram should sum close to 1 (after L2 normalization)
+    for hist in histograms:
+        assert np.abs(np.linalg.norm(hist) - 1.0) < 1e-6

@@ -11,78 +11,46 @@ class HOG1DParams:
     """Parameters for HOG1D descriptor."""
 
     n_bins: int = 8
-    """Number of orientation bins."""
-
-    cells: tuple[int, int] = (1, 25)
-    """Cell dimensions [height, width]."""
-
+    cells: tuple[int, int] = (1, 25)  # height, width
     overlap: int = 0
-    """Overlap between cells."""
-
     scale: float = 0.1
-    """Scale factor for gradient computation."""
-
     signed: bool = True
-    """Whether to use signed gradients (-π/2 to π/2) or unsigned (0 to π/2)."""
 
 
 class HOG1D(BaseDescriptor):
-    """1D Histogram of Oriented Gradients descriptor.
-
-    Implementation of HOG descriptor adapted for 1D time series, used as
-    the primary shape descriptor in the ShapeDTW paper.
-    """
-
-    def __init__(self, params: HOG1DParams | None = None) -> None:
-        """Initialize HOG1D descriptor.
-
-        Args:
-            params: Parameters for HOG1D computation
-        """
+    def __init__(self, params: HOG1DParams | None = None):
         self.params = params or HOG1DParams()
-        self.handles_multivariate = False
+
         # Precompute angle bins
         if self.params.signed:
-            self.angles = np.linspace(
-                -np.pi / 2, np.pi / 2, self.params.n_bins + 1, dtype=np.float64
-            )
+            self.angles = np.linspace(-np.pi / 2, np.pi / 2, self.params.n_bins + 1)
         else:
-            self.angles = np.linspace(
-                0, np.pi / 2, self.params.n_bins + 1, dtype=np.float64
-            )
+            self.angles = np.linspace(0, np.pi / 2, self.params.n_bins + 1)
 
-        # Compute center angles for interpolation
+        # Center angles for cosine interpolation
         self.center_angles = (self.angles[:-1] + self.angles[1:]) / 2
 
     def __call__(self, subsequence: npt.NDArray[np.float64]) -> npt.NDArray[np.float64]:
-        """Compute HOG1D descriptor for subsequence.
-
-        Args:
-            subsequence: Time series subsequence
-
-        Returns:
-            descriptor: HOG1D descriptor vector
-        """
         # Validate input
         seq = self._validate_input(subsequence)
+
         # Handle multivariate case
         if seq.shape[1] > 1:
             return self._compute_multivariate_hog1d(seq)
 
-        # Compute gradients
+        # Compute gradients and angles
         grads, angles = self._compute_gradients(seq)
 
-        # Compute histogram for each cell
+        # Compute histograms for each cell
         cell_width = self.params.cells[1]
         stride = cell_width - self.params.overlap
 
         n_cells = len(range(0, len(grads) - cell_width + 1, stride))
-        histograms = np.zeros((n_cells, self.params.n_bins), dtype=np.float64)
+        histograms = np.zeros((n_cells, self.params.n_bins))
 
         for i, start in enumerate(range(0, len(grads) - cell_width + 1, stride)):
             cell_grads = grads[start : start + cell_width]
             cell_angles = angles[start : start + cell_width]
-
             histograms[i] = self._compute_cell_histogram(cell_grads, cell_angles)
 
         return histograms.flatten()
@@ -90,43 +58,39 @@ class HOG1D(BaseDescriptor):
     def _compute_gradients(
         self, seq: npt.NDArray[np.float64]
     ) -> tuple[npt.NDArray[np.float64], npt.NDArray[np.float64]]:
-        """Compute gradients and their orientations.
+        """Compute gradients exactly as in MATLAB implementation."""
+        seq_flat = seq.flatten()
+        dx = self.params.scale  # Fixed dx scale
 
-        Args:
-            seq: Input sequence
+        if len(seq_flat) < 3:
+            # Handle short sequences
+            dy = np.diff(seq_flat)
+            grads = np.abs(dy / dx)
+            angles = np.arctan2(dy, dx)
+            return np.pad(grads, (0, 1)), np.pad(angles, (0, 1))
 
-        Returns:
-            magnitudes: Gradient magnitudes
-            angles: Gradient angles
-        """
-        # Compute centered gradients
-        grads = np.gradient(seq.flatten()) / self.params.scale
+        # Compute centered differences
+        dy = seq_flat[2:] - seq_flat[:-2]
+        grads = np.abs(dy / (2 * dx))  # Magnitude
+        angles = np.arctan2(dy, 2 * dx)  # Angle
 
-        # Compute angles - use 1 as dx since we're dealing with time series
-        angles = np.arctan2(grads, 1)
+        # Pad first and last gradient
+        grads = np.pad(grads, (1, 1), mode="edge")
+        angles = np.pad(angles, (1, 1), mode="edge")
 
         if not self.params.signed:
             angles = np.abs(angles)
 
-        return np.abs(grads), angles
+        return grads, angles
 
     def _compute_cell_histogram(
         self, grads: npt.NDArray[np.float64], angles: npt.NDArray[np.float64]
     ) -> npt.NDArray[np.float64]:
-        """Compute orientation histogram for one cell.
+        """Compute histogram for one cell using cosine interpolation."""
+        histogram = np.zeros(self.params.n_bins)
 
-        Args:
-            grads: Gradient magnitudes in cell
-            angles: Gradient angles in cell
-
-        Returns:
-            histogram: Orientation histogram
-        """
-        histogram = np.zeros(self.params.n_bins, dtype=np.float64)
-
-        # For each gradient in the cell
         for grad, angle in zip(grads, angles, strict=False):
-            # Find which bin it belongs to
+            # Find which bin the angle falls into
             bin_idx = np.searchsorted(self.angles, angle) - 1
 
             # Handle edge cases
@@ -135,7 +99,7 @@ class HOG1D(BaseDescriptor):
             elif bin_idx < 0:
                 bin_idx = 0
 
-            # Linear interpolation between neighboring bins
+            # Cosine interpolation
             if bin_idx == 0:
                 # First bin
                 weight = np.cos(self.center_angles[0] - angle)
@@ -147,7 +111,7 @@ class HOG1D(BaseDescriptor):
                 histogram[-2] += grad * (1 - weight)
                 histogram[-1] += grad * weight
             else:
-                # Middle bins
+                # Middle bins - find closest center angle
                 angle_diff = angle - self.center_angles[bin_idx]
                 if abs(angle_diff) > abs(angle - self.center_angles[bin_idx + 1]):
                     weight = np.cos(self.center_angles[bin_idx + 1] - angle)

@@ -13,6 +13,7 @@ from pyshapeDTW.data.ucr import UCRDataset
 from pyshapeDTW.descriptors.base import BaseDescriptor
 from pyshapeDTW.descriptors.hog1d import HOG1D, HOG1DParams
 from pyshapeDTW.descriptors.paa import PAA, PAAParams
+from pyshapeDTW.descriptors.slope import Slope, SlopeParams
 from pyshapeDTW.descriptors.wavelets import DWT, DWTParams
 from pyshapeDTW.elastic_measure.shape_dtw import ShapeDTW
 from pyshapeDTW.evaluation.alignment import (
@@ -31,8 +32,8 @@ from pyshapeDTW.evaluation.classification import (
 )
 from pyshapeDTW.evaluation.plots import (
     plot_alignment_eval,
+    plot_all_alignments,
     plot_classification_comparison,
-    plot_warped_ts,
 )
 
 app = typer.Typer()
@@ -187,6 +188,7 @@ def ucr_alignment(
         ),
         "PAA": PAA(PAAParams(seg_num=5)),  # 5 equal-length intervals
         "DWT": DWT(DWTParams()),  # Default params as in paper
+        "Slope": Slope(SlopeParams()),
     }
 
     config = AlignmentEvalConfig(
@@ -230,31 +232,37 @@ def ucr_alignment(
     fig = plot_alignment_eval(results_df)
     fig.savefig(results_dir / "alignment_results_full.png")
 
-    # Create plots for best aligments samples
-    fig_dtw = plt.figure(figsize=(15, 12))
-    fig_shape = plt.figure(figsize=(15, 12))
+    # Create alignment_samples subfolder if it doesn't exist
+    samples_dir = results_dir / "alignment_samples"
+    samples_dir.mkdir(exist_ok=True)
 
-    # Plot random one
-    fig_dtw = plot_warped_ts(
-        best_alignments[0].original,
-        best_alignments[0].transformed,
-        best_alignments[0].dtw_match,
-        fig_dtw,
-    )
-    # Plot ShapeDTW results
-    if best_alignments[0].shapedtw_match is not None:
-        fig_shape = plot_warped_ts(
-            best_alignments[0].original,
-            best_alignments[0].transformed,
-            best_alignments[0].shapedtw_match,
-            fig_shape,
+    # Get indices of top 5 error gaps
+    top_5_indices = summary_df.sort_values("error_gap", ascending=False).index[:5]
+
+    # Plot the 5 alignments with largest error gaps
+    for i, idx in enumerate(top_5_indices):
+        alignment = best_alignments[idx]
+
+        # Create matches dictionary for each method
+        matches = {
+            # "GT": alignment.gt_match,
+            "DTW": alignment.dtw_match,
+        }
+        if alignment.shapedtw_match is not None:
+            matches[f"shapeDTW-{alignment.descriptor_name}"] = alignment.shapedtw_match
+
+        # Create combined plot
+        fig = plot_all_alignments(
+            alignment.original, alignment.transformed, matches, figsize=(15, 15)
         )
-    plt.tight_layout()
-    fig_dtw.savefig(results_dir / "warped_dtw.png")
-    fig_shape.savefig(results_dir / "warped_sdtw.png")
+
+        # Save plot with error gap info in filename
+        error_gap = summary_df.loc[idx, "error_gap"]
+        fig.savefig(samples_dir / f"alignment_sample_{i+1}_gap_{error_gap:.4f}.png")
+        plt.close(fig)
 
     # Print summary
-    typer.echo(f"\nResults saved to: {results_dir}")
+    typer.echo(f"\nResults saved to: {samples_dir}")
     typer.echo("\nBest alignment gaps per dataset:")
     for _, row in summary_df.sort_values("error_gap", ascending=False).iterrows():
         typer.echo(
@@ -289,6 +297,7 @@ def ucr_classification(
         ),
         "PAA": PAA(PAAParams(seg_num=5)),  # 5 equal-length intervals
         "DWT": DWT(DWTParams()),  # Default params as in paper
+        "Slope": Slope(SlopeParams()),
     }
 
     # Configure evaluation

@@ -206,10 +206,10 @@ def ucr_alignment(
     results_df, best_alignments = evaluator.run_evaluation()
 
     # Save numerical results
-    results_df.to_csv(results_dir / "alignment_results_full.csv", index=False)
+    results_df.to_csv(results_dir / "alignment_results_full_MAD.csv", index=False)
 
     # Save best alignment samples using pickle
-    with open(results_dir / "best_alignments_full.pkl", "wb") as f:
+    with open(results_dir / "best_alignments_full_MAD.pkl", "wb") as f:
         pickle.dump(best_alignments, f)
 
     # Create summary of best alignments
@@ -226,14 +226,14 @@ def ucr_alignment(
     ]
 
     summary_df = pd.DataFrame(summary_rows)
-    summary_df.to_csv(results_dir / "best_alignments_summary_full.csv", index=False)
+    summary_df.to_csv(results_dir / "best_alignments_summary_full_MAD.csv", index=False)
 
     # Plot overall results
     fig = plot_alignment_eval(results_df)
-    fig.savefig(results_dir / "alignment_results_full.png")
+    fig.savefig(results_dir / "alignment_results_full_MAD.png")
 
     # Create alignment_samples subfolder if it doesn't exist
-    samples_dir = results_dir / "alignment_samples"
+    samples_dir = results_dir / "alignment_samples_MAD"
     samples_dir.mkdir(exist_ok=True)
 
     # Get indices of top 5 error gaps

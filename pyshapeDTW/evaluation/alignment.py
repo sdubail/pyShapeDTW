@@ -129,6 +129,47 @@ def scale_time_series(
     return scale * ts
 
 
+def compute_mean_absolute_deviation(
+    pred_align: np.ndarray,  # shape (N, 2) containing (i,j) index pairs
+    gt_align: np.ndarray,  # shape (M, 2) containing (i,j) index pairs
+    seq_len1: int,  # Length of reference sequence
+) -> float:
+    """
+    Compute mean absolute deviation between predicted and ground truth DTW alignments.
+
+    As defined in the paper:
+    - Computes the area between two warping paths
+    - Normalizes by the length of the reference sequence
+    """
+    if len(gt_align) == 0 or len(pred_align) == 0:
+        raise ValueError("Empty alignment passed")
+
+    # Sort alignments by reference sequence index (i)
+    pred_align = pred_align[pred_align[:, 0].argsort()]
+    gt_align = gt_align[gt_align[:, 0].argsort()]
+
+    # Convert to paths by getting target sequence indices (j)
+    pred_path = pred_align[:, 1]
+    gt_path = gt_align[:, 1]
+
+    # Interpolate paths to have values at every reference sequence index
+    ref_indices = np.arange(seq_len1)
+
+    # Interpolate predicted path
+    pred_path_interp = np.interp(ref_indices, pred_align[:, 0], pred_path)
+
+    # Interpolate ground truth path
+    gt_path_interp = np.interp(ref_indices, gt_align[:, 0], gt_path)
+
+    # Compute area between paths as sum of absolute differences
+    area = np.sum(np.abs(pred_path_interp - gt_path_interp))
+
+    # Normalize by reference sequence length
+    mad = area / seq_len1
+
+    return mad
+
+
 def compute_alignment_error(
     pred_align: np.ndarray, gt_align: np.ndarray, seq_len1: int, seq_len2: int
 ) -> float:
@@ -213,8 +254,10 @@ class AlignmentEvaluator:
         # Standard DTW
         alignment = dtw(original, transformed)
         dtw_match = np.column_stack((alignment.index1, alignment.index2))
-        dtw_error = compute_alignment_error(
-            dtw_match, gt_align, len(original), len(transformed)
+        dtw_error = compute_mean_absolute_deviation(  # compute_alignment_error(
+            dtw_match,
+            gt_align,
+            len(original),  # , len(transformed)
         )
 
         results.append(
@@ -229,8 +272,10 @@ class AlignmentEvaluator:
         # DerivativeDTW
         dedtw = DerivativeDTW()
         _, _, dedtw_match = dedtw(original, transformed)
-        dedtw_error = compute_alignment_error(
-            dedtw_match, gt_align, len(original), len(transformed)
+        dedtw_error = compute_mean_absolute_deviation(  # compute_alignment_error(
+            dedtw_match,
+            gt_align,
+            len(original),  # , len(transformed)
         )
 
         results.append(
@@ -251,8 +296,10 @@ class AlignmentEvaluator:
         sdtw = ShapeDTW(seqlen=self.config.seqlen)
         for desc_name, descriptor in self.config.descriptors.items():
             _, _, _, sdtw_match = sdtw(original, transformed, descriptor)
-            sdtw_error = compute_alignment_error(
-                sdtw_match, gt_align, len(original), len(transformed)
+            sdtw_error = compute_mean_absolute_deviation(  # compute_alignment_error(
+                sdtw_match,
+                gt_align,
+                len(original),  # , len(transformed)
             )
 
             results.append(
@@ -341,8 +388,10 @@ class AlignmentEvaluator:
     def run_evaluation(self) -> tuple[pd.DataFrame, list[BestAlignmentSample]]:
         """Run evaluation on all configured datasets with incremental saving."""
         # Create results directory files
-        results_path = self.config.results_dir / "alignment_results_incremental.csv"
-        alignments_path = self.config.results_dir / "best_alignments_incremental.pkl"
+        results_path = self.config.results_dir / "alignment_results_incremental_MAD.csv"
+        alignments_path = (
+            self.config.results_dir / "best_alignments_incremental_MAD.pkl"
+        )
 
         # Load existing results if any
         if results_path.exists():

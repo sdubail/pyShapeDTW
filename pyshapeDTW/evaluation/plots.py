@@ -184,30 +184,31 @@ def plot_alignment_eval(results_df: pd.DataFrame) -> plt.Figure:
     fig, ax = plt.subplots(figsize=(15, 10))
 
     for method in results_df["method"].unique():
-        method_data = results_df[results_df["method"] == method]
+        if "HOG1D" not in method:
+            method_data = results_df[results_df["method"] == method]
 
-        means = method_data.groupby("stretch_pct")["error"].mean()
-        stds = method_data.groupby("stretch_pct")["error"].std()
+            means = method_data.groupby("stretch_pct")["error"].mean()
+            stds = method_data.groupby("stretch_pct")["error"].std()
 
-        ax.plot(
-            means.index,
-            means.values,
-            marker="o",
-            markersize=8,
-            label=method,
-            linewidth=3,
-        )
-        ax.fill_between(
-            means.index,
-            means.values - stds.values,
-            means.values + stds.values,
-            alpha=0.2,
-        )
+            ax.plot(
+                means.index,
+                means.values,
+                marker="o",
+                markersize=8,
+                label=method,
+                linewidth=3,
+            )
+            # ax.fill_between(
+            #     means.index,
+            #     means.values - stds.values,
+            #     means.values + stds.values,
+            #     alpha=0.05,
+            # )
 
     ax.set_xlabel("Stretch Percentage", fontsize=25, labelpad=10)
-    ax.set_ylabel("Alignment Error", fontsize=25, labelpad=10)
-    ax.set_title("Alignment Error vs Stretch Percentage", fontsize=25, pad=15)
-    ax.legend(fontsize=25, frameon=False)
+    ax.set_ylabel("Mean Absolute Deviation", fontsize=25, labelpad=10)
+    # ax.set_title("Alignment Error vs Stretch Percentage", fontsize=25, pad=15)
+    ax.legend(fontsize=20, frameon=False)
     ax.grid(True, alpha=0.3)
 
     # Style ticks
@@ -242,9 +243,9 @@ def plot_classification_comparison(results_df: pd.DataFrame) -> plt.Figure:
         ax.scatter(
             merged["accuracy_dtw"],
             merged["accuracy_shape"],
-            label=method,
             alpha=0.6,
             s=100,
+            color="blue",
         )
 
         # Add diagonal line
@@ -252,13 +253,13 @@ def plot_classification_comparison(results_df: pd.DataFrame) -> plt.Figure:
             min(ax.get_xlim()[0], ax.get_ylim()[0]),
             max(ax.get_xlim()[1], ax.get_ylim()[1]),
         ]
-        ax.plot(lims, lims, "k--", alpha=0.5, zorder=0)
+        ax.plot(lims, lims, "k--", alpha=0.6, zorder=0)
 
-        ax.set_xlabel("DTW Accuracy", fontsize=25, labelpad=10)
-        ax.set_ylabel("ShapeDTW Accuracy", fontsize=25, labelpad=10)
-        ax.set_title(method, fontsize=25, pad=15)
+        ax.set_xlabel("DTW Accuracy", fontsize=35, labelpad=10)
+        ax.set_ylabel("ShapeDTW Accuracy", fontsize=35, labelpad=10)
+        ax.set_title(method, fontsize=35, pad=15)
         ax.grid(True, alpha=0.3)
-        ax.legend(fontsize=25, frameon=False)
+        ax.legend(fontsize=35, frameon=False)
 
         # Style ticks
         ax.tick_params(width=2, length=6)

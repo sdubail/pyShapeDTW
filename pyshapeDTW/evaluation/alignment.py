@@ -1,7 +1,7 @@
 import pickle
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import numpy as np
 import numpy.typing as npt
@@ -11,10 +11,9 @@ from tqdm import tqdm
 
 from pyshapeDTW.data.ucr import UCRDataset
 from pyshapeDTW.descriptors.base import BaseDescriptor
-from pyshapeDTW.descriptors.hog1d import HOG1D
+from pyshapeDTW.descriptors.wavelets import DWT
 from pyshapeDTW.elastic_measure.derivative_dtw import DerivativeDTW
 from pyshapeDTW.elastic_measure.shape_dtw import ShapeDTW
-from pyshapeDTW.evaluation.plots import plot_alignment_eval
 
 
 @dataclass
@@ -226,7 +225,7 @@ class AlignmentEvalConfig:
     n_nest: int = 10
     descriptors: dict[str, BaseDescriptor] = field(
         default_factory=lambda: {
-            "HOG1D": HOG1D(),
+            "DWT": DWT(),
         }
     )
     seqlen: int = 30

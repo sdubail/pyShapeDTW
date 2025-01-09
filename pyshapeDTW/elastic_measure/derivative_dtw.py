@@ -1,10 +1,7 @@
-from typing import Optional, Tuple
-
 import numpy as np
 import numpy.typing as npt
 from dtw import dtw
 
-from pyshapeDTW.elastic_measure.base_dtw import dtw_fast, dtw_locality
 from pyshapeDTW.elastic_measure.warping import wpath2mat
 
 

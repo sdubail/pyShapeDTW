@@ -1,5 +1,4 @@
 import pickle
-from datetime import datetime
 from pathlib import Path
 
 import matplotlib.pyplot as plt
@@ -15,13 +14,11 @@ from pyshapeDTW.descriptors.hog1d import HOG1D, HOG1DParams
 from pyshapeDTW.descriptors.paa import PAA, PAAParams
 from pyshapeDTW.descriptors.slope import Slope, SlopeParams
 from pyshapeDTW.descriptors.wavelets import DWT, DWTParams
-from pyshapeDTW.elastic_measure.shape_dtw import ShapeDTW
 from pyshapeDTW.evaluation.alignment import (
     AlignmentEvalConfig,
     AlignmentEvaluator,
     ScaleParams,
     StretchParams,
-    compute_alignment_error,
     scale_time_series,
     simulate_smooth_curve,
     stretching_ts,
@@ -145,8 +142,6 @@ def ucr_alignment(
     ),
 ) -> None:
     """Compare DTW and ShapeDTW alignments on UCR datasets."""
-    # if dataset_names is None:
-    #     dataset_names = ["GunPoint", "ECG200", "Coffee"]
     dataset_names = pd.read_csv(dataset_file, header=0)["dataset"].to_list()
     typer.echo(f"Looking at {len(dataset_names)} datasets from {dataset_file}")
 
@@ -159,14 +154,6 @@ def ucr_alignment(
 
     # Setup descriptors with parameters from paper
     descriptors: dict[str, BaseDescriptor] = {
-        "HOG1D": HOG1D(
-            HOG1DParams(
-                n_bins=8,
-                cells=(1, 25),  # Two non-overlapping intervals
-                overlap=0,
-                scale=0.1,
-            )
-        ),
         "PAA": PAA(PAAParams(seg_num=5)),  # 5 equal-length intervals
         "DWT": DWT(DWTParams()),  # Default params as in paper
         "Slope": Slope(SlopeParams()),
@@ -260,22 +247,11 @@ def ucr_classification(
     ),
 ) -> None:
     """Run classification evaluation on UCR datasets comparing DTW and shapeDTW."""
-
-    # dataset_names = ["CinCECGtorso"]  # ["GunPoint", "ECG200", "Coffee"]  # Example datasets
-    # dataset_names = np.loadtxt(dataset_file, dtype=str).tolist()
     dataset_names = pd.read_csv(dataset_file, header=0)["dataset"].to_list()
     typer.echo(f"Looking at {len(dataset_names)} datasets from {dataset_file}")
 
     # Setup descriptors with parameters from paper
     descriptors: dict[str, BaseDescriptor] = {
-        "HOG1D": HOG1D(
-            HOG1DParams(
-                n_bins=8,
-                cells=(1, 25),  # Two non-overlapping intervals
-                overlap=0,
-                scale=0.1,
-            )
-        ),
         "PAA": PAA(PAAParams(seg_num=5)),  # 5 equal-length intervals
         "DWT": DWT(DWTParams()),  # Default params as in paper
         "Slope": Slope(SlopeParams()),

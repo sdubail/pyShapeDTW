@@ -4,7 +4,7 @@ import numpy as np
 from dtw import dtw
 
 
-def dtw_fast(p: np.ndarray, q: np.ndarray) -> Tuple[float, np.ndarray]:
+def dtw_fast(p: np.ndarray, q: np.ndarray) -> tuple[float, np.ndarray]:
     """Fast DTW implementation using dtw-python package.
 
     Args:
@@ -20,8 +20,8 @@ def dtw_fast(p: np.ndarray, q: np.ndarray) -> Tuple[float, np.ndarray]:
 
 
 def dtw_locality(
-    s: np.ndarray, t: np.ndarray, w: Optional[float] = None
-) -> Tuple[float, np.ndarray, int, np.ndarray]:
+    s: np.ndarray, t: np.ndarray, w: float | None = None
+) -> tuple[float, np.ndarray, int, np.ndarray]:
     """DTW with locality constraint using dtw-python package.
 
     Args:

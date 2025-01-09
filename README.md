@@ -18,9 +18,9 @@ The project is organized into several key components:
   - `base_dtw.py`: Base DTW functionality
 
 - **Shape fescriptors**: Different ways to capture local shape information
-  - `HOG1D`: 1D Histogram of Oriented Gradients
   - `PAA`: Piecewise Aggregate Approximation
   - `Wavelets`: Discrete Wavelet Transform descriptors
+  - `Slope`: Linear slope computed over local segments
 
 ### Evaluation frameworks 📊
 

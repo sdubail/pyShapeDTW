@@ -70,10 +70,11 @@ class UCRDataset:
             raise ValueError("split must be one of 'train', 'test', or 'all'")
 
         # Load data using tslearn's cache
+        print("Loading dataset...")
         X_train, y_train, X_test, y_test = self.loader.load_dataset(dataset_name)
         if X_train is None:
             raise ValueError(f"Failed to load dataset {dataset_name}")
-
+        print("Done loading.")
         # Process data based on split
         if split == "all":
             # Remove singleton dimension if univariate

@@ -96,52 +96,33 @@ def simulate_alignments(
         noise_level=noise,
     )
 
-    # Run standard DTW
-    alignment = dtw(orig, transformed)
-    dtw_match = np.column_stack((alignment.index1, alignment.index2))
+    # Set the font to Helvetica and increase font size
+    plt.rcParams["font.family"] = "Helvetica"
+    plt.rcParams["font.size"] = 15
 
-    # Run ShapeDTW
-    descriptor = DESCRIPTORS[descriptor_arg]
-    sdtw = ShapeDTW(seqlen=20)
-    _, _, _, sdtw_match = sdtw(orig, transformed, descriptor)
+    # Create figure with a reasonable size
+    plt.figure(figsize=(10, 6))
 
-    # Create plots
-    fig_dtw = plt.figure(figsize=(15, 12))
-    fig_shape = plt.figure(figsize=(15, 12))
+    # Plot with increased line width
+    plt.plot(orig, linewidth=3, label="Original Sequence", color="black")
+    plt.plot(transformed, linewidth=3, label="Transformed Sequence", color="red")
 
-    # Plot DTW results
-    plot_warped_ts(orig, transformed, dtw_match, fig_dtw)
+    # Add labels and title
+    plt.xlabel("Time Steps")
+    plt.ylabel("Amplitude")
+    plt.title("Sequence alignment comparison")
 
-    # Plot ShapeDTW results
-    plot_warped_ts(orig, transformed, sdtw_match, fig_shape)
+    # Add legend with clean styling
+    plt.legend(frameon=False)
 
+    # Clean up the plot
+    plt.grid(True, linestyle="--", alpha=0.7)
     plt.tight_layout()
 
-    dtw_error = compute_alignment_error(
-        dtw_match, gt_align, len(orig), len(transformed)
+    # Save the plot
+    plt.savefig(
+        "pyshapeDTW/results/visu_alignment_transfo.png", dpi=300, bbox_inches="tight"
     )
-    sdtw_error = compute_alignment_error(
-        sdtw_match, gt_align, len(orig), len(transformed)
-    )
-
-    typer.echo("\nSequence Lengths:")
-    typer.echo(f"Original: {len(orig)}")
-    typer.echo(f"Transformed: {len(transformed)}")
-    typer.echo("\nWarping Path Lengths:")
-    typer.echo(f"Ground Truth: {len(gt_align)}")
-    typer.echo(f"DTW: {len(dtw_match)}")
-    typer.echo(f"ShapeDTW: {len(sdtw_match)}")
-    typer.echo("\nAlignment Errors:")
-    typer.echo(f"DTW: {dtw_error:.4f}")
-    typer.echo(f"ShapeDTW: {sdtw_error:.4f}")
-
-    # Save if requested
-    if save_path is not None:
-        plt.savefig(f"pyshapeDTW/results/{save_path}")
-
-    # Show if requested
-    if show:
-        plt.show()
 
 
 @app.command("ucr-alignment")

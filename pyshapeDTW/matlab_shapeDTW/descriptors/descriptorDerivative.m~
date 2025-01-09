@@ -1,8 +1,0 @@
-% first approximate the sequence by PAA, and then compute derivative 
-
-
-function descriptorDerivative(sequence, param)
-end
-
-
-

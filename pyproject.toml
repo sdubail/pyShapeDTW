@@ -23,6 +23,7 @@ dependencies = [
     "typer",
     "PyWavelets",
     "tqdm",
+    "pandas",
     "tslearn", # if crashes comment this line and install on the side with pip
 ]
 

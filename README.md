@@ -6,6 +6,21 @@ A Python implementation of Shape-based Dynamic Time Warping (ShapeDTW) for time 
 
 PyShapeDTW provides advanced time series similarity computation through shape-based features. It extends traditional Dynamic Time Warping (DTW) by incorporating local shape information, making it more robust to amplitude variations and noise while preserving important shape characteristics.
 
+## 🧪 Demonstration notebook
+A demonstration notebook is available in `pyshapeDTW/demo/demo.ipynb`
+
+## 🛠️ Installation
+
+```bash
+conda create -n shapeDTW
+conda activate shapeDTW
+pip install -e ".[all]"
+```
+To run tests : 
+```bash
+pytest
+```
+
 ## 🏗️ Architecture
 
 The project is organized into several key components:
@@ -63,19 +78,6 @@ Assesses the quality of sequence alignments by:
 4. Visualizing the results
 
 Can be run for any UCR dataset.
-
-## 🛠️ Installation
-
-```bash
-conda create -n shapeDTW
-conda activate shapeDTW
-pip install uv
-uv pip install -e ".[all]"
-```
-To run tests : 
-```bash
-pytest
-```
 
 ## 📚 Documentation
 

@@ -10,7 +10,6 @@ from tqdm import tqdm
 
 from pyshapeDTW.data.ucr import UCRDataset
 from pyshapeDTW.descriptors.base import BaseDescriptor
-from pyshapeDTW.descriptors.hog1d import HOG1D, HOG1DParams
 from pyshapeDTW.descriptors.paa import PAA, PAAParams
 from pyshapeDTW.descriptors.slope import Slope, SlopeParams
 from pyshapeDTW.descriptors.wavelets import DWT, DWTParams
@@ -34,12 +33,6 @@ from pyshapeDTW.evaluation.plots import (
 )
 
 app = typer.Typer()
-
-DESCRIPTORS: dict[str, BaseDescriptor] = {
-    "hog1d": HOG1D(HOG1DParams(cells=(1, 25))),
-    "paa": PAA(PAAParams(seg_num=4)),
-    "dwt": DWT(DWTParams()),
-}
 
 
 def generate_test_sequences(
